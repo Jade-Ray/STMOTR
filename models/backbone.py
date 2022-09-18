@@ -8,9 +8,10 @@ from utils.misc import NestedTensor, nested_tensor_from_ori_mask
 
 class VideoSwinTransformerBackbone(nn.Module):
     def __init__(self, backbone_pretrained, backbone_pretrained_path, train_backbone, **kwargs):
+        super(VideoSwinTransformerBackbone, self).__init__()
         # default Swin-T
         swin_backbone = SwinTransformer3D(
-            patch_size=(2, 4, 4), embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24), 
+            patch_size=(1, 4, 4), embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24), 
             window_size=(8, 7, 7), drop_path_rate=0.1, patch_norm=True)
         if backbone_pretrained:
             state_dict = torch.load(backbone_pretrained_path, map_location='cpu')['state_dict']
@@ -24,7 +25,10 @@ class VideoSwinTransformerBackbone(nn.Module):
             swin_backbone.load_state_dict(state_dict)
     
         self.layer_output_channels = swin_backbone.layer_num_features
-        self.backbone = swin_backbone
+        self.patch_embed = swin_backbone.patch_embed
+        self.pos_drop = swin_backbone.pos_drop
+        self.layers = swin_backbone.layers
+        self.norm = swin_backbone.norm
         self.train_backbone = train_backbone
         if not train_backbone:
             for parameter in self.parameters():
@@ -32,8 +36,14 @@ class VideoSwinTransformerBackbone(nn.Module):
     
     def forward(self, samples: NestedTensor):
         vid_frames = rearrange(samples.tensors, 't b c h w -> b c t h w')
-        output = self.backbone(vid_frames)
-        output = rearrange(output, 'b c t h w -> t b c h w')
+        
+        vid_embeds = self.patch_embed(vid_frames)
+        vid_embeds = self.pos_drop(vid_embeds)
+        for layer in self.layers:
+            vid_embeds = layer(vid_embeds.contiguous())
+        output = rearrange(vid_embeds, 'b c t h w -> b t h w c')
+        output = self.norm(output)
+        output = rearrange(output, 'b t h w c -> t b c h w')
         output = nested_tensor_from_ori_mask(output, samples.mask)
         return output
         

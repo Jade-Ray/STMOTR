@@ -6,7 +6,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 import motmetrics as mm
 
-from datasets.interpolations import InterpolateTrack
+from datasets.interpolations import InterpolateTrack as interpolate
 from utils.box_ops import box_xyxy_to_xywh
 
 
@@ -45,8 +45,8 @@ class MOTeval(object):
         
         # poly fit all results if frame skiped
         if len(pred_frameids) != len(tgt_frameids):
-            boxes = InterpolateTrack.poly(pred_frameids, boxes, tgt_frameids)
-            scores = InterpolateTrack.poly(pred_frameids, scores, tgt_frameids)
+            boxes = self.interpolate_tracks(pred_frameids, boxes, tgt_frameids, 'poly2')
+            scores = self.interpolate_tracks(pred_frameids, scores, tgt_frameids, 'poly2')
         
         self.pred_data[tgt['item']].update({
             'frame_ids': tgt_frameids,
@@ -54,6 +54,23 @@ class MOTeval(object):
             'boxes': boxes,
             'query_ids': query_ids,
         })
+    
+    def interpolate_tracks(self, frameids, tracks, new_frameids, type='poly2'):
+        """interpolate tracks [N, T, c] new frameids."""
+        if tracks.shape[0] == 0:
+            # fill empty tracks to new frameids.
+            return torch.zeros(0, len(new_frameids), tracks.shape[-1])
+        if type == 'poly2':
+            return torch.stack(
+                [interpolate.poly(frameids, t, new_frameids, 2) for t in tracks],
+                dim=0,)
+        elif type == 'copy':
+            return torch.stack(
+                [interpolate.copy(frameids, t, new_frameids) for t in tracks],
+                dim=0,)
+        else:
+            raise ValueError(f'Unknonw interpolate way {type}')
+            
     
     def synchronize_between_processes(self):
         pass

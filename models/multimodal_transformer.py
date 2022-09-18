@@ -31,8 +31,9 @@ class MultimodalTransformer(nn.Module):
         vid_embeds = rearrange(vid_embeds, 't b c h w -> (h w) (t b) c')
         seq_mask = rearrange(vid_pad_mask, 't b h w -> (t b) (h w)')
         vid_pos_embed = self.pos_encoder_2d(rearrange(vid_pad_mask, 't b h w -> (t b) h w'), self.d_model)
+        pos_embed = rearrange(vid_pos_embed, 't_b h w c -> (h w) t_b c')
         
-        memory = self.encoder(vid_embeds, src_key_padding_mask=seq_mask, pos=vid_pos_embed) # [S, T*B, C]
+        memory = self.encoder(vid_embeds, src_key_padding_mask=seq_mask, pos=pos_embed) # [S, T*B, C]
         vid_memory = rearrange(memory, '(h w) (t b) c -> t b c h w', h=h, w=w, t=t, b=b)
         
         # add T*B dims to query embeds (was: [N, C], where N is the number of object queries):
@@ -40,7 +41,7 @@ class MultimodalTransformer(nn.Module):
         tgt = torch.zeros_like(obj_queries)  # [N, T*B, C]
 
         # hs is [L, N, T*B, C] where L is number of layers in the decoder
-        hs = self.decoder(tgt, memory, memory_key_padding_mask=seq_mask, pos=vid_pos_embed, query_pos=obj_queries)
+        hs = self.decoder(tgt, memory, memory_key_padding_mask=seq_mask, pos=pos_embed, query_pos=obj_queries)
         hs = rearrange(hs, 'l n (t b) c -> l t b n c', t=t, b=b)
         
         return hs, vid_memory

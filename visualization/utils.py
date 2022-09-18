@@ -1,7 +1,7 @@
 import warnings
+from typing import List
 from PIL import Image
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 import torch
 from torch import Tensor
@@ -18,8 +18,8 @@ logger = logging.get_logger(__name__)
 
 
 @torch.no_grad()
-def plot_inputs_as_video(inputs: Tensor, boxes: list[Tensor], 
-                         frameids: list[Tensor], cfg) -> Tensor:
+def plot_inputs_as_video(inputs: Tensor, boxes: List[Tensor], 
+                         frameids: List[Tensor], cfg) -> Tensor:
     """
     Normalize Inverse inputs tensor, and draw Boundingboxes on images, return video tensor of (B, T, C, H, W).
     """
@@ -156,7 +156,7 @@ def plot_table(cellText, figsize=(12, 7), rowLabels=None, colLabels=None, **kwar
     return fig
 
 
-def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: list[Image.Image], 
+def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: List[Image.Image], 
                                       boxes: np.ndarray, query_id: int, frame_ids: np.ndarray):
     """Visualize DETR encoder-decoder multi-head attention weights."""
     assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
@@ -178,7 +178,7 @@ def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: list[Im
 def plot_deformable_attention_weights(attn_weights: np.ndarray, attn_points: np.ndarray,
                                       spatial_shapes: np.ndarray,
                                       refer_points: np.ndarray, expand_points: np.ndarray, 
-                                      pil_imgs: list[Image.Image], boxes: np.ndarray, 
+                                      pil_imgs: List[Image.Image], boxes: np.ndarray, 
                                       query_id: int, frame_ids: np.ndarray):
     """Visualize Deformable DETR encoder-decoder multi-head attention weights."""
     assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1

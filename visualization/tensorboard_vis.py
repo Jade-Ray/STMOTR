@@ -12,7 +12,6 @@ from torchvision.utils import make_grid
 
 import utils.logging as logging
 import visualization.utils as vis_utils
-from utils.misc import get_class_names, inverse_sigmoid
 
 log.getLogger('PIL').setLevel(log.WARNING)
 log.getLogger("matplotlib").setLevel(log.ERROR)

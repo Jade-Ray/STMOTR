@@ -97,7 +97,7 @@ class SingleVideoParser():
     
     def get_image(self, frame_id: int) -> Image.Image:
         """Return indicted image selected by frame_id."""
-        return Image.open(self.imDir / f'{(frame_id - self.start_frame_id):06}{self.imExt}')
+        return Image.open(self.imDir / f'{frame_id:06}{self.imExt}')
     
     def get_gt(self, frame_ids: List[int]) -> pd.DataFrame:
         df = self.gt[self.gt['frame_index'].isin(frame_ids)]
@@ -119,10 +119,10 @@ class SingleVideoParser():
                 if i in track_group['frame_index'].values:
                     referred.append(True)
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
-                    vises.append(track_group.loc[track_group['frame_index'] == i, ['visibility']].values[0])
+                    vises.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
                 else:
                     referred.append(False)
-                    bboxes.append(np.zeros(4, dypte=float))
+                    bboxes.append(np.zeros(4, dtype=float))
                     vises.append(0.)
             video_mate['referred'].append(np.array(referred))
             video_mate['boxes'].append(np.array(bboxes))
@@ -173,7 +173,7 @@ class SingleVideoParser():
         frame_ids = self._get_sampling_frame_ids(item)
         images = self.get_images(frame_ids)
         video_mate = self.convert2mate(self.get_gt(frame_ids))
-        assert len({len(images), len(video_mate['boxes']), len(video_mate['referred'])}) == 1
+        assert len({len(images), video_mate['boxes'].shape[1], video_mate['referred'].shape[1]}) == 1
         
         return images, video_mate
 
@@ -269,6 +269,6 @@ class Collator:
         self.subset_type = subset_type
     
     def __call__(self, batch):
-        samples, targets = list(zip(*batch))
-        samples = nested_tensor_from_videos_list(samples) # [T, B, C, H, W]
-        return tuple(samples, targets)
+        batch = list(zip(*batch))
+        batch[0] = nested_tensor_from_videos_list(batch[0]) # [T, B, C, H, W]
+        return tuple(batch)

@@ -223,14 +223,8 @@ class SwinTransformerBlock3D(nn.Module):
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
-        
-    def forward(self, x, mask_matrix):
-        """ Forward function.
-        Args:
-            x: Input feature, tensor size (B, D, H, W, C).
-            mask_matrix: Attention mask for cyclic shift.
-        """
-        shortcut = x
+
+    def forward_part1(self, x, mask_matrix):
         B, D, H, W, C = x.shape
         window_size, shift_size = get_window_size((D, W, H), self.window_size, self.shift_size)
         
@@ -264,8 +258,24 @@ class SwinTransformerBlock3D(nn.Module):
             
         if pad_d1 > 0 or pad_r > 0 or pad_b > 0:
             x = x[:, :D, :H, :W, :].contiguous()
-        x += shortcut
-        x += self.drop_path(self.mlp(self.norm2(x)))
+        return x
+
+    def forward_part2(self, x):
+        return self.drop_path(self.mlp(self.norm2(x)))
+    
+    def forward(self, x, mask_matrix):
+        """ Forward function.
+        Args:
+            x: Input feature, tensor size (B, D, H, W, C).
+            mask_matrix: Attention mask for cyclic shift.
+        """
+        shortcut = x
+        
+        x = self.forward_part1(x, mask_matrix)
+        x = shortcut + x
+        
+        x = x + self.forward_part2(x)
+        
         return x
 
 

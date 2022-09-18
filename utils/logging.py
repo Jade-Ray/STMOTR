@@ -29,7 +29,7 @@ def _suppress_print():
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
     # Use 1K buffer if writing to cloud storage.
-    io = os.open(
+    io = open(
         filename, "a", buffering=1024 if "://" in filename else -1
     )
     atexit.register(io.close)
@@ -99,7 +99,7 @@ def log_json_stats(stats, output_dir=None):
     if du.is_root_proc() and output_dir:
         filename = os.path.join(output_dir, "json_stats.log")
         try:
-            with os.open(
+            with open(
                 filename, "a", buffering=1024 if "://" in filename else -1
             ) as f:
                 f.write("json_stats: {:s}\n".format(json_stats))

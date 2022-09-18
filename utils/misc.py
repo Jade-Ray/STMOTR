@@ -10,7 +10,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from utils.logging import logging
+import utils.logging as logging
 
 logger = logging.get_logger(__name__)
 

@@ -66,7 +66,7 @@ class SetCriterion(nn.Module):
         # Compute all the requested losses
         losses = {}
         for loss in losses_to_compute:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_tracks))
+            losses.update(self.get_loss(loss, outputs, targets, indices, num_tracks=num_tracks))
         return losses
     
     def loss_is_referred(self, outputs, targets, indices, **kwargs):
@@ -77,10 +77,11 @@ class SetCriterion(nn.Module):
         
         idx = self._get_src_permutation_idx(indices)
         target_is_referred_o = torch.cat([t["referred"][J] for t, (_, J) in zip(targets, indices)]) # [batch_obj_num, T]
-        target_is_referred[idx] = target_is_referred_o # [B, N, T]
+        target_is_referred[idx] = target_is_referred_o.long() # [B, N, T]
         
         loss = F.cross_entropy(pred_is_referred.permute(1, 3, 2, 0),
-                               target_is_referred, self.empty_weight,
+                               target_is_referred, 
+                               self.empty_weight.to(pred_is_referred.device),
                                reduction='none') # [B, N, T]
         loss = loss.mean(-1).sum() / B # sum and normalize the loss by the batch 
         

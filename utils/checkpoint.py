@@ -107,7 +107,7 @@ def save_checkpoint(path_to_job, model, optimizer, lr_scheduler, epoch, cfg):
     path_to_checkpoint = get_path_to_checkpoint(
         path_to_job, epoch + 1,
     )
-    with os.open(path_to_checkpoint, "wb") as f:
+    with open(path_to_checkpoint, "wb") as f:
         torch.save(checkpoint, f)
     return path_to_checkpoint
 
@@ -138,7 +138,7 @@ def load_checkpoint(
     ms = model.module if data_parallel else model
     
     # Load the checkpoint on CPU to avoid GPU mem spike.
-    with os.open(path_to_checkpoint, "rb") as f:
+    with open(path_to_checkpoint, "rb") as f:
         checkpoint = torch.load(f, map_location="cpu")
     ms.load_state_dict(checkpoint['model_state_dict'])
     if 'epoch' in checkpoint.keys():

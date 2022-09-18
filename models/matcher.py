@@ -2,7 +2,6 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torch import nn
 
-from utils.misc import nested_tensor_from_tensor_list, interpolate
 from utils.box_ops import box_cxcywh_to_xyxy
 from utils.track_ops import generalized_track_iou, track_distance
 
@@ -85,11 +84,9 @@ class HungarianMatcher(nn.Module):
 def compute_is_referred_cost(outputs, targets):
     pred_is_referred = outputs['pred_is_referred'].flatten(1, 2).softmax(dim=-1)  # [t, b*nq, 2]
     tgt_referred = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
-    
-    each_frame_referred_cost = []
-    for pr_ref, tgt_ref in zip(pred_is_referred, tgt_referred):
-        each_frame_referred_cost.append(pr_ref[tgt_ref])
-    cost_is_referred = torch.stack(each_frame_referred_cost, dim=0).mean(dim=0) # [b*nq, num_tra]
+    tgt_referred = tgt_referred[:, None].repeat(1, pred_is_referred.shape[1], 1) # [t, b*nq, num_tra]
+    cost_is_referred = torch.gather(pred_is_referred, 2, tgt_referred) # [t, b*nq, num_tra]
+    cost_is_referred = cost_is_referred.mean(dim=0) # [b*nq, num_tra]
     
     return cost_is_referred
 

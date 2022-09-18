@@ -213,8 +213,7 @@ class Normalize(object):
         self.std = std
 
     def __call__(self, images, targets=None):
-        # convert to `channel` x `num frames` x `height` x `width`
-        images = F.normalize(images, mean=self.mean, std=self.std).transpose(0, 1)
+        images = F.normalize(images, mean=self.mean, std=self.std)
         if targets is None:
             return images, None
         targets = targets.copy()

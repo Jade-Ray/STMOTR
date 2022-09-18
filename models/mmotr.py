@@ -21,7 +21,7 @@ class MMOTR(nn.Module):
         self.is_referred_head = nn.Linear(d_model, 2)  # binary 'is referred?' prediction head for object queries
         self.box_head = MLP(d_model, d_model, 4, num_layers=2)
         self.query_embed = nn.Embedding(num_queries, d_model)
-        self.backbone_proj = nn.Conv2d(self.backbone.layer_output_channels[1], d_model, kernel_size=1)
+        self.backbone_proj = nn.Conv2d(self.backbone.layer_output_channels[-1], d_model, kernel_size=1)
         self.aux_loss = aux_loss
         
     def forward(self, samples: NestedTensor):
@@ -40,10 +40,11 @@ class MMOTR(nn.Module):
         hs, vid_memory = transformer_out
         
         outputs_is_referred = self.is_referred_head(hs)  # [L, T, B, N, 2]
-        outputs_boxes = self.box_head(hs) # [L, T, B, N, 4]
+        outputs_coords = self.box_head(hs) # [L, T, B, N, 4]
+        outputs_coords = outputs_coords.sigmoid()
         
         layer_outputs = []
-        for pb, pir in zip(outputs_boxes, outputs_is_referred):
+        for pb, pir in zip(outputs_coords, outputs_is_referred):
             layer_out = {'pred_boxes': pb,
                          'pred_is_referred': pir}
             layer_outputs.append(layer_out)
@@ -72,7 +73,6 @@ class MLP(nn.Module):
 
 
 def build(args):
-    device = args.device
     model = MMOTR(**vars(args))
     matcher = build_matcher(args)
     weight_dict = {'loss_is_referred': args.is_referred_loss_coef,
@@ -85,7 +85,6 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     criterion = SetCriterion(matcher=matcher, weight_dict=weight_dict, eos_coef=args.eos_coef)
-    criterion.to(device)
     if args.dataset_name == 'tunnel':
         postprocessor = TunnelPostProcess()
     else:

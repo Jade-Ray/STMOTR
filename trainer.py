@@ -50,7 +50,7 @@ class Trainer:
         model, criterion, postprocessor = build_model(cfg)
         # Determine the GPU used by the current process
         cur_device = torch.cuda.current_device()
-        model.to(self.device)
+        model.cuda(device=cur_device)
         if cfg.distributed:
             model = torch.nn.parallel.DistributedDataParallel(
                 module=model,
@@ -174,7 +174,7 @@ class Trainer:
                 
             # run gc collection before starting a new epoch to avoid possible OOM errors due to swinT caching :
             self.clear_memory()
-            if self.distributed:
+            if self.cfg.distributed:
                 dist.barrier()
 
         if self.writer is not None:
@@ -195,6 +195,8 @@ class Trainer:
             if self.cfg.num_gpus:
                 samples = samples.cuda(non_blocking=True)
                 targets = [{k: v.cuda(non_blocking=True) for k, v in t.items()} for t in targets]
+            
+            self.train_meter.data_toc()
 
             with amp.autocast(enabled=self.cfg.enable_amp):
                 outputs = self.model(samples)
@@ -242,6 +244,11 @@ class Trainer:
             self.train_meter.log_iter_stats(cur_epoch, cur_iter)
             torch.cuda.synchronize()
             self.train_meter.iter_tic()
+        del samples
+        # Log epoch stats.
+        self.train_meter.synchronize_between_processes()
+        self.train_meter.log_epoch_stats(cur_epoch)
+        self.train_meter.reset()
             
     @torch.no_grad()
     def eval_epoch(self, cur_epoch):

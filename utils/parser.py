@@ -91,14 +91,19 @@ def load_config(args, path_to_config=None):
         cfg = {**cfg, **config}
     # Load config from command line, overwrite config from opts.
     if args.opts is not None:
-        opts = set(args.opts)
-        opts = {k: v for k, v in zip(opts[0::2], opts[1::2])}
-        cfg = {**cfg, **opts}
+        for key, value in zip(args.opts[0::2], args.opts[1::2]):
+            if hasattr(cfg, key):
+                if isinstance(cfg[key], int):
+                    cfg[key] = int(value)
+                elif isinstance(cfg[key], float):
+                    cfg[key] = float(value)
+                else:
+                    cfg[key] = value
     cfg = argparse.Namespace(**cfg)
 
     # Inherit parameters from args.
-    if hasattr(args, "num_gups"):
-        cfg.num_gups = max(min(args.num_gpus, torch.cuda.device_count()), 1)
+    if hasattr(args, "num_gpus"):
+        cfg.num_gpus = max(min(args.num_gpus, torch.cuda.device_count()), 1)
     if hasattr(args, "num_shards") and hasattr(args, "shard_id") and hasattr(args, "init_method"):
         cfg.num_shards = args.num_shards
         cfg.shard_id = args.shard_id

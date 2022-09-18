@@ -1,12 +1,12 @@
 # * Train & Eval
 lr:
   desc: main model learning rate
-  value: 1e-4
+  value: 1.0e-4
 lr_backbone:
   desc: backbone learning rate
-  value: 1e-5
+  value: 1.0e-5
 weight_decay:
-  value: 1e-4
+  value: 1.0e-4
 clip_max_norm:
   desc: gradient clipping max norm
   value: 0.1
@@ -32,7 +32,7 @@ eval_period:
 save_period:
   desc: save checkpoint period of epochs
   value: 10
-reffered_threshold:
+referred_threshold:
   desc: the threshold of whether obj is reffered from all query
   value: 0.5
 
@@ -96,7 +96,7 @@ giou_loss_coef:
   value: 1
 eos_coef:
   desc: Relative classification weight of the no-object class
-  value: 0.1
+  value: 0.3
 
 # * Dataset Parameters
 dataset_name:
@@ -130,7 +130,7 @@ num_workers:
   desc: number of workers to load data
   value: 4
 batch_size:
-  value: 1
+  value: 2
 eval_batch_size:
   value: 1
 

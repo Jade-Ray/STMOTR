@@ -5,7 +5,7 @@ from utils.parser import parse_args, load_config
 import utils.distributed as du
 
 
-def run(process_id, cfg):
+def run(process_id, cfg, running_mode):
     if cfg.num_gpus > 1:
         cfg.distributed = True
         # Initialize the process group.
@@ -19,7 +19,7 @@ def run(process_id, cfg):
         cfg.distributed = False
     
     trainer = Trainer(cfg)
-    if cfg.running_mode == 'train':
+    if running_mode == 'train':
         trainer.train()
     else:  # eval mode:
         trainer.evaluate()
@@ -38,9 +38,10 @@ def main():
             torch.multiprocessing.spawn(
                 run, 
                 nprocs=cfg.num_gpus, 
-                args=(cfg,))
+                args=(cfg, args.running_mode))
         else:  # run on a single GPU or CPU
-            run(process_id=0, cfg=cfg)
+            run(process_id=0, cfg=cfg, 
+                running_mode=args.running_mode)
 
 
 if __name__ == '__main__':
