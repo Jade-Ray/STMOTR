@@ -7,9 +7,9 @@ from einops import rearrange
 from utils.box_ops import box_cxcywh_to_xyxy
 
 
-class TunnelPostProcess(nn.Module):
+class BasePostProcess(nn.Module):
     def __init__(self):
-        super(TunnelPostProcess, self).__init__()
+        super(BasePostProcess, self).__init__()
     
     @torch.inference_mode()
     def forward(self, outputs, orig_sample_sizes):

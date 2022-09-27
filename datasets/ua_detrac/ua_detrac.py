@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from PIL import Image
 import xml.etree.ElementTree as ET
 
 import torch
@@ -105,12 +106,12 @@ class SingleVideoParser(SingleVideoParserBase):
         """Reading the mot sequence information from xml file"""
         
         self.sequence_name = mot_file_path.stem
-        self.imDir = mot_file_path.parents[1] / self.sequence_name / 'Insight-MVT_Annotation'
+        self.imDir = mot_file_path.parents[1] / 'Insight-MVT_Annotation' / self.sequence_name
         self.frameRate = 25.0
         self.seqLength = len(list(self.imDir.glob('*.jpg')))
         self.imWidth = 960
         self.imHeight = 540
-        self.imExt = 'jpg'
+        self.imExt = '.jpg'
         self.labelDir = mot_file_path
     
     def _read_mot_file(self):
@@ -151,6 +152,10 @@ class SingleVideoParser(SingleVideoParserBase):
         
         self.gt = df
     
+    def get_image(self, frame_id: int) -> Image.Image:
+        """Return indicted image selected by frame_id."""
+        return Image.open(self.imDir / f'img{frame_id:05}{self.imExt}')
+    
     def convert2mate(self, df_gt: pd.DataFrame) -> dict:
         frame_indexes = df_gt['frame_index'].unique()
         video_mate = defaultdict(list)
@@ -158,7 +163,7 @@ class SingleVideoParser(SingleVideoParserBase):
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
-            referred, bboxes, vises, confidences = [], [], []
+            referred, bboxes, vises, confidences = [], [], [], []
             for i in frame_indexes:
                 if i in track_group['frame_index'].values:
                     referred.append(True)
@@ -210,9 +215,9 @@ class UADETRAC(Dataset):
     def _load_data_from_sequence_list(self, sampling_num, sampling_rate):
         sequence_file = Path(__file__).parent / f'sequence_list_{self.subset_type}.txt'
         if self.subset_type == 'train':
-            data_folder = self.root / 'train' / 'DETRAC-Annotations-XML'
+            data_folder = self.dataset_path / 'train' / 'DETRAC-Annotations-XML'
         else:
-            data_folder = self.root / 'test' / 'DETRAC-Annotations-XML'
+            data_folder = self.dataset_path / 'test' / 'DETRAC-Annotations-XML'
 
         sequence_file_list = np.loadtxt(sequence_file, dtype=str)
         sequence_file_list = sequence_file_list if sequence_file_list.ndim > 0 else [sequence_file_list]
@@ -226,7 +231,7 @@ class UADETRAC(Dataset):
         for file_path in pbar:
             pbar.set_description(f'reading: {file_path}')
             self.data += [SingleVideoParser(
-                file_path, subset_type=self.subset_type, 
+                mot_file_path=file_path, subset_type=self.subset_type, 
                 num_frames=sampling_num, sampling_rate=sampling_rate)]
             
         # Compute some basic information from data

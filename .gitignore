@@ -31,5 +31,5 @@ MANIFEST
 
 # Data
 data
-output
+output*
 runs*

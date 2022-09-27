@@ -7,7 +7,7 @@ from models.backbone import build as backbone_build
 from models.matcher import build_matcher
 from models.multimodal_transformer import MultimodalTransformer
 from models.criterion import SetCriterion
-from models.postprocessing import TunnelPostProcess
+from models.postprocessing import BasePostProcess
 from utils.misc import NestedTensor
 
 
@@ -86,7 +86,9 @@ def build(args):
 
     criterion = SetCriterion(matcher=matcher, weight_dict=weight_dict, eos_coef=args.eos_coef)
     if args.dataset_name == 'tunnel':
-        postprocessor = TunnelPostProcess()
+        postprocessor = BasePostProcess()
+    elif args.dataset_name == 'ua':
+        postprocessor = BasePostProcess()
     else:
         assert False, f'postprocessing for dataset: {args.dataset_name} is not supported'
     return model, criterion, postprocessor

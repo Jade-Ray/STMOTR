@@ -92,7 +92,7 @@ class Tunnel(Dataset):
         for file_path in pbar:
             pbar.set_description(f'reading: {file_path}')
             self.data += [SingleVideoParser(
-                file_path, subset_type=self.subset_type, 
+                mot_file_path=file_path, subset_type=self.subset_type, 
                 num_frames=sampling_num, sampling_rate=sampling_rate)]
             
         # Compute some basic information from data
