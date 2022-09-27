@@ -1,8 +1,12 @@
 import torch
+import torch.distributed as dist
 
 from trainer import Trainer
 from utils.parser import parse_args, load_config
 import utils.distributed as du
+import utils.logging as logging
+
+logger = logging.get_logger(__name__)
 
 
 def run(process_id, cfg, running_mode):
@@ -21,8 +25,18 @@ def run(process_id, cfg, running_mode):
     trainer = Trainer(cfg)
     if running_mode == 'train':
         trainer.train()
+    elif running_mode == 'ablation':
+        trainer.visualization()
     else:  # eval mode:
-        trainer.evaluate()
+        logger.info(f"Only Eval")
+        trainer.eval_epoch(trainer.epochs)
+        trainer.clear_memory()
+        if cfg.distributed:
+            dist.barrier()
+
+        if trainer.writer is not None:
+            trainer.writer.close()
+        logger.info(f"Eval Done")
 
 
 def main():

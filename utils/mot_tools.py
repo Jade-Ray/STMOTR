@@ -36,7 +36,7 @@ class MOTeval(object):
         scores = pred['scores'] # [N, T]
         # get mask of query above threshold and less than two elements are True in T dim.
         mask = (scores > self.logit_threshold).sum(-1) > 2 # n
-        query_ids = torch.nonzero(mask, as_tuple=True)[0]
+        query_ids = torch.nonzero(mask, as_tuple=True)[0].cpu().numpy() # n
         boxes = pred['boxes'][mask].cpu().numpy() # [n, T, 4]
         scores = scores[mask].cpu().numpy() # [n, T]
         
@@ -59,15 +59,15 @@ class MOTeval(object):
         """interpolate tracks [N, T, c] new frameids."""
         if tracks.shape[0] == 0:
             # fill empty tracks to new frameids.
-            return torch.zeros(0, len(new_frameids), tracks.shape[-1])
+            return np.zeros((0, len(new_frameids), tracks.shape[-1]))
         if type == 'poly2':
-            return torch.stack(
+            return np.stack(
                 [interpolate.poly(frameids, t, new_frameids, 2) for t in tracks],
-                dim=0,)
+                axis=0,)
         elif type == 'copy':
-            return torch.stack(
+            return np.stack(
                 [interpolate.copy(frameids, t, new_frameids) for t in tracks],
-                dim=0,)
+                axis=0,)
         else:
             raise ValueError(f'Unknonw interpolate way {type}')
             
@@ -93,9 +93,14 @@ class MOTeval(object):
                 track_ids = [ai_id.id for _ in range(pred['boxes'].shape[0])]
             else:
                 track_ids = []
-                for cur_ind, last_ind, mask in zip(*hungarian_match_iou(current_pred_boxes, last_pred_boxes)):
-                    if mask:
-                        track_ids.append(last_trackids[last_ind])
+                cur_ind, last_ind, mask = hungarian_match_iou(current_pred_boxes, last_pred_boxes)
+                for i in np.arange(current_pred_boxes.shape[0]):
+                    if i in cur_ind:
+                        pos = list(cur_ind).index(i)
+                        if mask[pos]:
+                            track_ids.append(last_trackids[last_ind[pos]])
+                        else:
+                            track_ids.append(ai_id.id)
                     else:
                         track_ids.append(ai_id.id)
                         

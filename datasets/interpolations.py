@@ -59,7 +59,7 @@ class InterpolateTrack():
     def poly(frame_ids, y, new_frame_ids, deg: int=2):
         """Use a Least squares polynomial fit of degree deg to fill in new frame ids"""
         assert frame_ids.shape[0] == y.shape[0], "frame_ids and track data lengthes should be same."
-        assert frame_ids.shape[0] < y.shape[0], "frame_ids lengthes should be less new_frame_ids."
+        assert frame_ids.shape[0] < new_frame_ids.shape[0], "frame_ids lengthes should be less new_frame_ids."
         if y.ndim == 2:
             coefficients = np.stack(
                 [np.polyfit(frame_ids, sub_y, deg) for sub_y in y.transpose()])

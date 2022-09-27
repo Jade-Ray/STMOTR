@@ -28,7 +28,7 @@ class HungarianMatcher(nn.Module):
         self.cost_giou = cost_giou
         assert cost_is_referred != 0 or cost_bbox != 0 or cost_giou != 0, "all costs cant be 0"
     
-    @torch.no_grad()
+    @torch.inference_mode()
     def forward(self, outputs, targets):
         """ Performs the matching
 
@@ -83,10 +83,22 @@ class HungarianMatcher(nn.Module):
 
 def compute_is_referred_cost(outputs, targets):
     pred_is_referred = outputs['pred_is_referred'].flatten(1, 2).softmax(dim=-1)  # [t, b*nq, 2]
-    tgt_referred = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
-    tgt_referred = tgt_referred[:, None].repeat(1, pred_is_referred.shape[1], 1) # [t, b*nq, num_tra]
-    cost_is_referred = torch.gather(pred_is_referred, 2, tgt_referred) # [t, b*nq, num_tra]
-    cost_is_referred = cost_is_referred.mean(dim=0) # [b*nq, num_tra]
+    device = pred_is_referred.device
+    # note that ref_indices are shared across time steps
+    target_is_referred_o = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
+    t, num_traj = target_is_referred_o.shape
+    
+    tgt_referred = torch.zeros((t, num_traj, 2), device=device)
+    # 'no object' class by default
+    tgt_referred[:, :, :] = torch.tensor([1.0, 0.0], device=device)
+    tgt_referred[target_is_referred_o == 1] = torch.tensor([0.0, 1.0], device=device)
+    
+    cost_is_referred = -(pred_is_referred.unsqueeze(2) * tgt_referred.unsqueeze(1)).sum(dim=-1).mean(dim=0)
+    
+    # tgt_referred = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
+    # tgt_referred = tgt_referred[:, None].repeat(1, pred_is_referred.shape[1], 1) # [t, b*nq, num_tra]
+    # cost_is_referred = torch.gather(pred_is_referred, 2, tgt_referred) # [t, b*nq, num_tra]
+    # cost_is_referred = -cost_is_referred.mean(dim=0) # [b*nq, num_tra]
     
     return cost_is_referred
 

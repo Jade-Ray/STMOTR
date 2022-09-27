@@ -260,6 +260,7 @@ class TunnelTransforms:
             'boxes': torch.tensor(video_mate['boxes']).view(-1, num_frame, 4),
             'referred': torch.tensor(video_mate['referred']).view(-1, num_frame),
             'orig_size': torch.tensor(video_mate['orig_size']),
+            'frame_indexes': torch.tensor(video_mate['frame_ids'])
         }
         return self.transforms(imgs, targets)
 

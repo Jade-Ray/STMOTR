@@ -3,13 +3,16 @@ This file contains a Trainer class which handles the training and evaluation of 
 """
 import pprint
 import gc
+from collections import defaultdict
 
 import numpy as np
+from tqdm import tqdm
 import torch
 import torch.distributed as dist
 import torch.cuda.amp as amp
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.optim.lr_scheduler import MultiStepLR
+from einops import rearrange
 
 from datasets import build_dataset, get_parser_data_from_dataset
 from models import build_model
@@ -179,9 +182,59 @@ class Trainer:
 
         if self.writer is not None:
             self.writer.close()
-        logger.info(f"testing done:\n {str(self.val_meter)}")
+        logger.info(f"Training done:\n {str(self.val_meter)}")
         
         return str(self.val_meter)
+
+    @torch.no_grad()
+    def test(self):
+        logger.info("Running Test DataLoader...")
+        self.model.eval()
+        total_results = {}
+        for samples, targets in tqdm(self.data_loader_val):
+        
+            # Transfer the data to the current GPU device.
+            if self.cfg.num_gpus:
+                samples = samples.cuda(non_blocking=True)
+                targets = [{k: v.cuda(non_blocking=True) for k, v in t.items()} for t in targets]
+            
+            outputs = self.model(samples)
+            orig_sample_sizes = torch.stack([t["orig_size"] for t in targets], dim=0).cuda(non_blocking=True)
+            predictions = self.postprocessor(outputs, orig_sample_sizes)
+            predictions = {target['item'].item(): prediction for target, prediction in zip(targets, predictions)}
+            total_results.update(du.gather_dict(predictions))
+            
+            torch.cuda.synchronize()
+        del samples
+        
+        logger.info("Getten total results, Then calculate PR_CURVE...")
+        # Calculate PR test in every log_threshold
+        log_thresholds = np.linspace(0, 1, 10)
+        recall_record, precision_record, mota_record = defaultdict(list), defaultdict(list), defaultdict(list)
+        
+        for log_threshold in log_thresholds:
+            self.mot_meter.update(total_results, log_threshold=log_threshold)
+            self.mot_meter.summarize()
+            logger.info(f"In {log_threshold} Threshold:\n {str(self.mot_meter)}")
+            
+            for sequence_name in self.mot_meter.summary.index:
+                recall_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'recall'])
+                precision_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'precision'])
+                mota_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'mota'])
+            
+            self.mot_meter.reset()
+
+        scores = {}
+        if self.writer is not None:
+            for sequence_name in self.mot_meter.summary.index:
+                score = tb.plot_pr_curve(self.writer, 
+                                        np.array(recall_record[sequence_name]), 
+                                        np.array(precision_record[sequence_name]), 
+                                        motas=np.array(mota_record[sequence_name]),
+                                        tag=f'{sequence_name} PR CURVE')
+                scores[sequence_name] = score
+        
+        return scores
 
     def train_epoch(self, cur_epoch: int):
         # Enable train mode.
@@ -260,7 +313,7 @@ class Trainer:
             epoch_step += 1
         epoch_step *= (len(self.data_loader_val) // self.cfg.board_freq)
         
-        for cur_iter, (samples, targets) in enumerate(self.data_loader_val):
+        for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
             # Transfer the data to the current GPU device.
             if self.cfg.num_gpus:
                 samples = samples.cuda(non_blocking=True)
@@ -301,6 +354,91 @@ class Trainer:
             }, global_step=cur_epoch)
             
         self.val_meter.reset()
+
+    @torch.no_grad()
+    def visualization(self, vis_input=True, vis_mid=True, 
+                      vis_res=True, vis_ablation=True):
+        logger.info('Model Visulization.')
+        self.model.eval()
+        
+        if vis_ablation:
+            conv_features, dec_attn_weights = [], []
+            hooks = [
+                self.model.backbone_proj.register_forward_hook(
+                    lambda self, input, output: conv_features.append(output)
+                ),
+                self.model.transformer.decoder.layers[-1].multihead_attn.register_forward_hook(
+                    lambda self, input, output: dec_attn_weights.append(output[1])
+                )
+            ]
+        
+        for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
+            # visualization input images
+            if self.writer is not None and vis_input:
+                input_video = vis_utils.plot_inputs_as_video(
+                    rearrange(samples.tensors, 't b c h w -> b c t h w'), 
+                    [t['boxes'] for t in targets],
+                    [t['frame_indexes'] for t in targets]
+                )
+                self.writer.add_video(input_video, tag='Video Input', global_step=cur_iter)
+                del input_video
+
+            # Transfer the data to the current GPU device.
+            if self.cfg.num_gpus:
+                samples = samples.cuda(non_blocking=True)
+                targets = [{k: v.cuda(non_blocking=True) for k, v in t.items()} for t in targets]
+            
+            self.val_meter.data_toc()
+
+            outputs = self.model(samples)
+            orig_sample_sizes = torch.stack([t["orig_size"] for t in targets], dim=0).cuda(non_blocking=True)
+            frameids = torch.stack([t["frame_indexes"] for t in targets], dim=0).cuda(non_blocking=True)
+            predictions = self.postprocessor(outputs, orig_sample_sizes)
+            for frameid, prediction in zip(frameids, predictions):
+                prediction.update({'frameids': frameid})
+            predictions = {target['item'].item(): prediction
+                           for target, prediction in zip(targets, predictions)}
+            predictions_gathered = du.gather_dict(predictions)
+            
+            torch.cuda.synchronize()
+            self.val_meter.iter_toc()
+            self.val_meter.update(predictions_gathered)
+            
+            # Visualization medium images
+            if self.writer is not None and vis_mid:
+                medium_video = vis_utils.plot_midresult_as_video(
+                    self.val_meter, list(predictions_gathered.keys()))
+                self.writer.add_video(
+                    medium_video, tag="Video Medium Result", 
+                    global_step=cur_iter)
+                del medium_video
+            
+            # visualization ablation images
+            if self.writer is not None and vis_ablation:
+                attn_dict = {'dec_attn_weights': dec_attn_weights[-1],
+                             'conv_features': conv_features[-1]}
+                tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
+                                  self.val_meter.base_ds)
+            
+            self.val_meter.synchronize_between_processes()
+            self.val_meter.summarize(save_pred=False)
+            
+            if vis_ablation:
+                for hook in hooks:
+                    hook.remove()
+            
+            # visualization final images
+            if self.writer is not None and vis_res:
+                for i, (sequence_name, meter) in enumerate(self.val_meter.meters.items()):
+                    final_video = vis_utils.plot_pred_as_video(
+                        sequence_name, meter, self.val_meter.base_ds)
+                    self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
+                    del final_video
+            
+            if self.writer is not None:
+                tb.plot_motmeter_table(self.writer, self.val_meter.summary)
+        
+        logging.info('Visulization Done.')
 
     def clear_memory(self):
         gc.collect()

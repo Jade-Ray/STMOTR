@@ -69,8 +69,9 @@ class SetCriterion(nn.Module):
             losses.update(self.get_loss(loss, outputs, targets, indices, num_tracks=num_tracks))
         return losses
     
-    def loss_is_referred(self, outputs, targets, indices, **kwargs):
+    def loss_is_referred(self, outputs, targets, indices, num_tracks, **kwargs):
         pred_is_referred = outputs['pred_is_referred'] # [T, B, N, 2]
+        device = pred_is_referred.device
         T, B, N = pred_is_referred.shape[:3]
         target_is_referred = torch.zeros((B, N, T), dtype=torch.int64,
                                          device=pred_is_referred.device)
@@ -78,12 +79,33 @@ class SetCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)
         target_is_referred_o = torch.cat([t["referred"][J] for t, (_, J) in zip(targets, indices)]) # [batch_obj_num, T]
         target_is_referred[idx] = target_is_referred_o.long() # [B, N, T]
+        # target_is_referred = target_is_referred.permute(2, 0, 1) # [T, B, N]
         
-        loss = F.cross_entropy(pred_is_referred.permute(1, 3, 2, 0),
-                               target_is_referred, 
-                               self.empty_weight.to(pred_is_referred.device),
-                               reduction='none') # [B, N, T]
-        loss = loss.mean(-1).sum() / B # sum and normalize the loss by the batch 
+        # tgt_referred = torch.zeros_like(pred_is_referred)
+        # tgt_referred[target_is_referred == 0] = torch.tensor([1.0, 0.0], device=device, dtype=tgt_referred.dtype)
+        # tgt_referred[target_is_referred == 1] = torch.tensor([0.0, 1.0], device=device, dtype=tgt_referred.dtype)
+        
+        # pred_is_referred = pred_is_referred.log_softmax(dim=-1)
+        # loss = -(pred_is_referred * tgt_referred).sum(-1) # [T, B, N]
+        # eos_coef = torch.full(loss.shape, 0.1, device=device)
+        # eos_coef[target_is_referred] = 1.0
+        # loss = loss * eos_coef
+        
+        target_onehot = torch.zeros((B, N, T, 2), dtype=torch.int64,
+                                    device=pred_is_referred.device)
+        target_onehot.scatter_(3, target_is_referred.unsqueeze(-1), 1)
+        
+        prob = pred_is_referred.softmax(-1).permute(1, 2, 0, 3) # [B, N, T, 2]
+        ce_loss = -prob.log() * target_onehot + (1 - (-prob.log())) * (1-target_onehot)
+        
+        p_t = prob*target_onehot + (1 - prob) * (1-target_onehot)
+        loss = ce_loss * ((1 - p_t) ** 2)
+        
+        alpha = 0.75
+        alpha_t = alpha * target_onehot + (1 - alpha) * (1-target_onehot)
+        loss = alpha_t * loss
+        
+        loss = loss.mean(2).sum() / (B)
         
         losses = {'loss_is_referred': loss}
         return losses

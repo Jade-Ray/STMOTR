@@ -163,7 +163,7 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
         for attn_weight, (key, value) in zip(attn_weights, results.items()):
             sequence_parser, _ = base_ds(key)
             
-            pred_scores = value['scores']
+            pred_scores = value['scores'] # n t
             pred_frameids = value['frameids'].cpu().numpy()[::frame_step]
             # filter less than logit_threshold obj 
             obj_index = torch.nonzero(pred_scores > logit_threshold, as_tuple=True)[0]

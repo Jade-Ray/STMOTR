@@ -19,22 +19,19 @@ logger = logging.get_logger(__name__)
 
 @torch.no_grad()
 def plot_inputs_as_video(inputs: Tensor, boxes: List[Tensor], 
-                         frameids: List[Tensor], cfg) -> Tensor:
+                         frameids: List[Tensor], 
+                         norm_mean=[0.485, 0.456, 0.406], norm_std=[0.229, 0.224, 0.225]) -> Tensor:
     """
     Normalize Inverse inputs tensor, and draw Boundingboxes on images, return video tensor of (B, T, C, H, W).
     """
     assert len({inputs.shape[0], len(boxes), len(frameids)}) == 1
-    normalizeInverse = NormalizeInverse(cfg.DATA.MEAN, cfg.DATA.STD)
+    normalizeInverse = NormalizeInverse(norm_mean, norm_std)
     B, C, T, H, W,  = inputs.shape
     
     outputs = []
     for batch_img, batch_boxes, batch_frameids in zip(inputs, boxes, frameids):
         batch_img, batch_boxes = normalizeInverse(batch_img.transpose(0, 1), 
                                                   boxes=batch_boxes.transpose(0, 1))
-        if batch_img.shape[0] != batch_frameids.shape[0]:
-            index_select = torch.linspace(0, batch_frameids.shape[0] - 1, batch_frameids.shape[0] // cfg.SLOWFAST.ALPHA).long()
-            batch_frameids = batch_frameids.index_select(0, index_select)
-            batch_boxes = batch_boxes.index_select(0, index_select)
         for img, box_list, frameid in zip(batch_img, batch_boxes.numpy(), batch_frameids.numpy()):
             mat = ImageConvert.to_mat_image(img)
             cv.putText(mat, f'{frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
@@ -85,16 +82,18 @@ def plot_midresult_as_video(mot_meter: MotValMeter, batch_items: list) -> Tensor
 
 
 @torch.no_grad()
-def plot_pred_as_video(sequence_name, meter, base_ds, cfg) -> Tensor:
+def plot_pred_as_video(sequence_name, meter, base_ds,
+                       save_video=False, output_dir='', 
+                       plot_interval=(1, 100), resize=(960, 540)) -> Tensor:
     """
     Plot MotValMeter final predication, return video tensor of (B, T, C, H, W).
     """
     outputs = []
     parser, _ = base_ds(sequence_name=sequence_name)
-    plot_interval = range(*cfg.TENSORBOARD.PROCESS_VIS.INTERVAL)
+    plot_interval = range(*plot_interval)
     
-    if cfg.TENSORBOARD.PROCESS_VIS.SAVE:
-        writer = cv.VideoWriter(f'{cfg.OUTPUT_DIR}/{sequence_name}.avi', 
+    if save_video:
+        writer = cv.VideoWriter(f'{output_dir}/{sequence_name}.avi', 
                                 cv.VideoWriter_fourcc(*'MJPG'), 10, 
                                 (parser.imWidth, parser.imHeight))
     else:
@@ -126,7 +125,7 @@ def plot_pred_as_video(sequence_name, meter, base_ds, cfg) -> Tensor:
                 cv.arrowedLine(mat, (o_r,o_b), (h_r,h_b), (255, 0, 0), 1)
 
         if frameid in plot_interval:
-            output = cv.resize(mat, cfg.TENSORBOARD.PROCESS_VIS.SIZE)
+            output = cv.resize(mat, resize)
             outputs.append(ImageConvert.to_tensor(output))
         if writer is not None:
             writer.write(mat)
@@ -134,7 +133,7 @@ def plot_pred_as_video(sequence_name, meter, base_ds, cfg) -> Tensor:
     
     if writer is not None:
         writer.release()
-        logger.info(f'Pred Video {cfg.OUTPUT_DIR}/{sequence_name}.avi saving done.')
+        logger.info(f'Pred Video {output_dir}/{sequence_name}.avi saving done.')
 
     return outputs[None]
 

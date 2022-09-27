@@ -30,9 +30,9 @@ def parse_args():
     )
     parser.add_argument(
         "--running_mode", 
-        choices=['train', 'eval'], 
+        choices=['train', 'eval', 'ablation'], 
         required=True,
-        help="mode to run, either 'train' or 'eval'"
+        help="mode to run, either 'train' or 'eval' or 'ablation'"
     )
     parser.add_argument(
         "--shard_id",

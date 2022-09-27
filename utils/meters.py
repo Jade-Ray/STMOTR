@@ -318,11 +318,13 @@ class MotValMeter(object):
         self.data_timer.pause()
         self.net_timer.reset()
     
-    def update(self, predictions: dict):
+    def update(self, predictions: dict, log_threshold: float = None):
         items = list(np.unique(list(predictions.keys())))
         
         for item in items:
             sequence_info = self.get_sequence_info(item)
+            if log_threshold is not None:
+                self.meters[sequence_info['name']].logit_threshold = log_threshold
             self.meters[sequence_info['name']].add_value(predictions[item], sequence_info)
 
     def synchronize_between_processes(self):

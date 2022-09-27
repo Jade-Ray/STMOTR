@@ -22,7 +22,7 @@ resume:
 rng_seed:
   value: 42
 epochs:
-  value: 30
+  value: 100
 log_period:
   desc: log period of epochs
   value: 10
@@ -130,7 +130,7 @@ num_workers:
   desc: number of workers to load data
   value: 4
 batch_size:
-  value: 2
+  value: 1
 eval_batch_size:
   value: 1
 

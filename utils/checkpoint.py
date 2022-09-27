@@ -54,7 +54,7 @@ def get_last_checkpoint(path_to_job, task=""):
     """
 
     d = get_checkpoint_dir(path_to_job)
-    names = list(map(str, d.iterdir())) if d.exists() else []
+    names = [_.name for _ in d.iterdir()] if d.exists() else []
     if task != "":
         names = [f for f in names if "{}_checkpoint".format(task) in f]
     else:
