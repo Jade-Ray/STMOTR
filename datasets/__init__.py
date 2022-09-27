@@ -1,4 +1,5 @@
 from datasets.tunnel import TunnelDataset
+from datasets.ua_detrac import UADETRAC
 
 
 def get_parser_data_from_dataset(dataset):
@@ -15,4 +16,6 @@ def get_parser_data_from_dataset(dataset):
 def build_dataset(image_set, dataset_name, **kwargs):
     if dataset_name == 'tunnel':
         return TunnelDataset(image_set, **kwargs)
+    elif dataset_name == 'ua':
+        return UADETRAC(image_set, **kwargs)
     raise ValueError(f'dataset {dataset_name} not supported')
