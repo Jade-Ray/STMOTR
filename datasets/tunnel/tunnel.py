@@ -249,7 +249,7 @@ class TunnelTransforms:
         if resize_and_crop_augmentations:
             if subset_type == 'train':
                 transforms.append(T.RandomResize(scales, max_size=train_max_size))
-            elif subset_type == 'valid':
+            elif subset_type == 'valid' or subset_type == 'test':
                 transforms.append(T.RandomResize([eval_short_size], max_size=eval_max_size)),
         transforms.extend([T.ToTensor(), normalize])
         self.transforms = T.Compose(transforms)

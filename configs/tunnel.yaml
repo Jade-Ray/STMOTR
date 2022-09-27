@@ -130,9 +130,9 @@ num_workers:
   desc: number of workers to load data
   value: 4
 batch_size:
-  value: 1
+  value: 2
 eval_batch_size:
-  value: 1
+  value: 2
 
 # * Tensorboard
 board_enable:
