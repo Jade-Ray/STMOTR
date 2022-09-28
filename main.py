@@ -26,7 +26,7 @@ def run(process_id, cfg, running_mode):
     if running_mode == 'train':
         trainer.train()
     elif running_mode == 'ablation':
-        trainer.visualization()
+        trainer.visualization(vis_ablation=False)
     else:  # eval mode:
         logger.info(f"Only Eval")
         trainer.eval_epoch(trainer.epochs)

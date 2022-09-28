@@ -61,7 +61,7 @@ def plot_midresult_as_video(mot_meter: MotValMeter, batch_items: list) -> Tensor
             
             gt_boxes = mate['boxes'][:,i].astype(int)
             if 'confidences' in mate.keys():
-                gt_confidences = mate['condidences'].astype(bool)
+                gt_confidences = mate['confidences'][:, i].astype(bool)
             else:
                 gt_confidences = np.ones(gt_boxes.shape[0]).astype(bool)
             for confidence, (l, t, r, b) in zip(gt_confidences, gt_boxes):
@@ -74,7 +74,10 @@ def plot_midresult_as_video(mot_meter: MotValMeter, batch_items: list) -> Tensor
                 l, t, r, b = boxes[i].astype(int)
                 text = f'{scores[i]:0.2f}'
                 cv.putText(mat, text, (l,t), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 1, cv.LINE_AA)
-                cv_rectangle(mat, (l,t), (r,b), (0, 0, 255), thickness=2)
+                if scores[i] > 0.5:
+                    cv_rectangle(mat, (l,t), (r,b), (0, 0, 255), thickness=2)
+                else:
+                    cv_rectangle(mat, (l,t), (r,b), (255, 153, 51), thickness=2)
             outputs.append(ImageConvert.to_tensor(mat))
     outputs = torch.stack(outputs, dim=0)
     B, (_, C, H, W) = len(batch_items), outputs.shape
@@ -89,7 +92,7 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
     Plot MotValMeter final predication, return video tensor of (B, T, C, H, W).
     """
     outputs = []
-    parser, _ = base_ds(sequence_name=sequence_name)
+    parser = base_ds(sequence_name=sequence_name)
     plot_interval = range(*plot_interval)
     
     if save_video:
@@ -294,7 +297,8 @@ def cv_rectangle(mat, pt1, pt2, color, thickness=1, style='', alpha=1.):
         style (str, optional): Style of the rectangle with 3 options.`dashed` is draw dashed line of rectangle, `dotted` is draw dotted line of rectangle, `''` is norm rectangle. Defaults to ''.
         alpha (float, optional): Alpha of the rectangle. Defaults to `1.`.
     """
-    
+    if pt1 == pt2:
+        return
     overlay = mat.copy()
     if style in ('dashed', 'dotted'):
         pts = [pt1,(pt2[0],pt1[1]),pt2,(pt1[0],pt2[1])] 

@@ -420,25 +420,30 @@ class Trainer:
                 tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
                                   self.val_meter.base_ds)
             
-            self.val_meter.synchronize_between_processes()
-            self.val_meter.summarize(save_pred=False)
-            
-            if vis_ablation:
-                for hook in hooks:
-                    hook.remove()
-            
-            # visualization final images
-            if self.writer is not None and vis_res:
-                for i, (sequence_name, meter) in enumerate(self.val_meter.meters.items()):
-                    final_video = vis_utils.plot_pred_as_video(
-                        sequence_name, meter, self.val_meter.base_ds)
-                    self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
-                    del final_video
-            
-            if self.writer is not None:
-                tb.plot_motmeter_table(self.writer, self.val_meter.summary)
+            torch.cuda.synchronize()
+            self.val_meter.iter_tic()
+        del samples
+        # Log epoch stats.
+        self.val_meter.synchronize_between_processes()
+        self.val_meter.summarize(save_pred=False)
         
-        logging.info('Visulization Done.')
+        if vis_ablation:
+            for hook in hooks:
+                hook.remove()
+            
+        # visualization final images
+        if self.writer is not None and vis_res:
+            for i, (sequence_name, meter) in enumerate(self.val_meter.meters.items()):
+                final_video = vis_utils.plot_pred_as_video(
+                    sequence_name, meter, self.val_meter.base_ds, 
+                    save_video=True, output_dir=self.output_dir)
+                self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
+                del final_video
+            
+        if self.writer is not None:
+            tb.plot_motmeter_table(self.writer, self.val_meter.summary)
+        
+        logger.info('Visulization Done.')
 
     def clear_memory(self):
         gc.collect()

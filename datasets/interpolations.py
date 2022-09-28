@@ -43,7 +43,7 @@ class InterpolateTrack():
     def copy(frame_ids, y, new_frame_ids):
         """Just copy y data to fill in new frame ids"""
         assert frame_ids.shape[0] == y.shape[0], "frame_ids and track data lengthes should be same."
-        assert frame_ids.shape[0] < y.shape[0], "frame_ids lengthes should be less new_frame_ids."
+        assert frame_ids.shape[0] < new_frame_ids.shape[0], "frame_ids lengthes should be less new_frame_ids."
         shape = y.shape
         shape[0] = new_frame_ids.shape[0]
         new_y = np.zeros(shape)
@@ -53,6 +53,28 @@ class InterpolateTrack():
                 temp_y = y[id]
             if temp_y is not None:
                 new_y[id] = temp_y.copy()
+        return new_y
+    
+    @staticmethod
+    def average(frame_ids, y, new_frame_ids):
+        """Calculate the average of two continuous frame to fill in new frame ids"""
+        assert frame_ids.shape[0] == y.shape[0], "frame_ids and track data lengthes should be same."
+        assert frame_ids.shape[0] < new_frame_ids.shape[0], "frame_ids lengthes should be less new_frame_ids."
+        ratio = int(new_frame_ids.shape[0] / y.shape[0])
+        
+        new_y = []
+        for i in range(len(frame_ids) - 1):
+            start_y = y[i].copy()
+            end_y = y[i + 1].copy()
+            if isinstance(start_y, np.ndarray):
+                temp = []
+                for sy, ey in zip(start_y, end_y):
+                    temp.append(np.linspace(sy, ey, ratio, endpoint=False))
+                new_y.append(np.stack(temp).transpose())
+            else:
+                new_y.append(np.linspace(start_y, end_y, ratio, endpoint=False))
+        new_y.append([y[-1].copy(), y[-1].copy()])
+        new_y = np.concatenate(new_y, axis=0)
         return new_y
     
     @staticmethod

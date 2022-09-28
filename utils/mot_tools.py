@@ -45,8 +45,8 @@ class MOTeval(object):
         
         # poly fit all results if frame skiped
         if len(pred_frameids) != len(tgt_frameids):
-            boxes = self.interpolate_tracks(pred_frameids, boxes, tgt_frameids, 'poly2')
-            scores = self.interpolate_tracks(pred_frameids, scores, tgt_frameids, 'poly2')
+            boxes = self.interpolate_tracks(pred_frameids, boxes, tgt_frameids, 'avg')
+            scores = self.interpolate_tracks(pred_frameids, scores, tgt_frameids, 'avg')
         
         self.pred_data[tgt['item']].update({
             'frame_ids': tgt_frameids,
@@ -55,19 +55,21 @@ class MOTeval(object):
             'query_ids': query_ids,
         })
     
-    def interpolate_tracks(self, frameids, tracks, new_frameids, type='poly2'):
+    def interpolate_tracks(self, frameids, tracks, new_frameids, type='copy'):
         """interpolate tracks [N, T, c] new frameids."""
         if tracks.shape[0] == 0:
             # fill empty tracks to new frameids.
             return np.zeros((0, len(new_frameids), tracks.shape[-1]))
         if type == 'poly2':
-            return np.stack(
-                [interpolate.poly(frameids, t, new_frameids, 2) for t in tracks],
-                axis=0,)
+            y = np.stack(
+                [interpolate.poly(frameids, t, new_frameids, 2) for t in tracks], axis=0,)
+            return np.clip(y, 0, None)
         elif type == 'copy':
             return np.stack(
-                [interpolate.copy(frameids, t, new_frameids) for t in tracks],
-                axis=0,)
+                [interpolate.copy(frameids, t, new_frameids) for t in tracks], axis=0,)
+        elif type == 'avg':
+            return np.stack(
+                [interpolate.average(frameids, t, new_frameids) for t in tracks], axis=0,)
         else:
             raise ValueError(f'Unknonw interpolate way {type}')
             
@@ -184,7 +186,7 @@ class AutoIncreseId(object):
         return self._id
 
 
-def hungarian_match_iou(src, tgt, cost_threshold=0.6):
+def hungarian_match_iou(src, tgt, cost_threshold=0.5):
     cost_iou = mm.distances.iou_matrix(src, tgt)
     indexes = linear_sum_assignment(cost_iou)
     mask = [cost_iou[src_ind, tgt_ind] < cost_threshold for src_ind, tgt_ind in zip(*indexes)]

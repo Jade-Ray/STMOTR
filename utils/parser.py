@@ -92,7 +92,7 @@ def load_config(args, path_to_config=None):
     # Load config from command line, overwrite config from opts.
     if args.opts is not None:
         for key, value in zip(args.opts[0::2], args.opts[1::2]):
-            if hasattr(cfg, key):
+            if key in cfg:
                 if isinstance(cfg[key], int):
                     cfg[key] = int(value)
                 elif isinstance(cfg[key], float):
