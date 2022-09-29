@@ -3,6 +3,7 @@ This file contains a Trainer class which handles the training and evaluation of 
 """
 import pprint
 import gc
+import time
 from collections import defaultdict
 
 import numpy as np
@@ -364,11 +365,11 @@ class Trainer:
         if vis_ablation:
             conv_features, dec_attn_weights = [], []
             hooks = [
-                self.model.backbone_proj.register_forward_hook(
-                    lambda self, input, output: conv_features.append(output)
+                self.model.transformer.register_forward_hook(
+                    lambda self, input, output: conv_features.append(input[0]) # t b c h w
                 ),
                 self.model.transformer.decoder.layers[-1].multihead_attn.register_forward_hook(
-                    lambda self, input, output: dec_attn_weights.append(output[1])
+                    lambda self, input, output: dec_attn_weights.append(output[1])  # (t b) q (h w)
                 )
             ]
         
@@ -415,10 +416,12 @@ class Trainer:
             
             # visualization ablation images
             if self.writer is not None and vis_ablation:
-                attn_dict = {'dec_attn_weights': dec_attn_weights[-1],
-                             'conv_features': conv_features[-1]}
+                t, b, _, h, w = conv_features[-1].shape
+                attn_dict = {
+                    'dec_attn_weights': rearrange(dec_attn_weights[-1], '(t b) q (h w) -> b q t h w', t=t, b=b, h=h, w=w),
+                    'conv_features': rearrange(conv_features[-1], 't b c h w -> b t c h w')} 
                 tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
-                                  self.val_meter.base_ds)
+                                  self.val_meter.base_ds, cur_epoch=cur_iter)
             
             torch.cuda.synchronize()
             self.val_meter.iter_tic()
@@ -443,6 +446,7 @@ class Trainer:
         if self.writer is not None:
             tb.plot_motmeter_table(self.writer, self.val_meter.summary)
         
+        time.sleep(1)
         logger.info('Visulization Done.')
 
     def clear_memory(self):

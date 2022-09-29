@@ -159,20 +159,27 @@ def plot_table(cellText, figsize=(12, 7), rowLabels=None, colLabels=None, **kwar
 
 
 def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: List[Image.Image], 
-                                      boxes: np.ndarray, query_id: int, frame_ids: np.ndarray):
+                                      boxes: np.ndarray, query_id: int, frame_ids: np.ndarray,
+                                      scores: np.ndarray=None, score_threshold: float=.5):
     """Visualize DETR encoder-decoder multi-head attention weights."""
     assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
     fig, axs = plt.subplots(ncols=len(pil_imgs), nrows=2, figsize=(22, 7))
-    for ax_i, img, (l, t, r, b), frameid in zip(axs.T, pil_imgs, boxes, frame_ids):
+    for i, ax_i in enumerate(axs.T):
+        l, t, r, b = boxes[i]
+        w, h = r - l, b - t
+        
         ax = ax_i[0]
-        ax.imshow(attn_weight)
+        ax.imshow(attn_weight[i])
         ax.axis('off')
-        ax.set_title(f'query id: {query_id}')
+        ax.set_title(f'frame id: {frame_ids[i]}')
         ax = ax_i[1]
-        ax.imshow(img)
-        ax.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='blue', linewidth=2))
+        ax.imshow(pil_imgs[i])
+        if scores is not None and scores[i] < score_threshold:
+            ax.add_patch(plt.Rectangle((l, t), w, h, fill=False, color='cyan', linestyle='--', linewidth=2))
+        else:
+            ax.add_patch(plt.Rectangle((l, t), w, h, fill=False, color='cyan', linewidth=2))
         ax.axis('off')
-        ax.set_title(f'frame id: {frameid}')
+    fig.suptitle(f'query id: {query_id}')
     fig.tight_layout()
     return fig
 

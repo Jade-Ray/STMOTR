@@ -96,7 +96,7 @@ class SetCriterion(nn.Module):
         target_onehot.scatter_(3, target_is_referred.unsqueeze(-1), 1)
         
         prob = pred_is_referred.softmax(-1).permute(1, 2, 0, 3) # [B, N, T, 2]
-        ce_loss = -prob.log() * target_onehot + (1 - (-prob.log())) * (1-target_onehot)
+        ce_loss = -prob.log() * target_onehot + (-(1 - prob).log()) * (1-target_onehot)
         
         p_t = prob*target_onehot + (1 - prob) * (1-target_onehot)
         loss = ce_loss * ((1 - p_t) ** 2)

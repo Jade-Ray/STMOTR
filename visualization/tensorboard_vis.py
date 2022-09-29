@@ -119,7 +119,7 @@ def plot_motmeter_table(writer: TensorboardWriter,
 
 
 def plot_dec_atten(writer: TensorboardWriter, attn_dict, results, 
-                   base_ds, obj_num=5, frame_step=4, 
+                   base_ds, obj_num=1, frame_step=1, cur_epoch=0,
                    logit_threshold=0.2):
     obj_counter = 0
     if 'attn_points' in attn_dict.keys():
@@ -144,7 +144,7 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
                                          device=expand_point.device)
             
             for boxes, queryid in zip(pred_boxes, pred_queryids):
-                if obj_counter > obj_num:
+                if obj_counter >= obj_num:
                     break
                 figure = vis_utils.plot_deformable_attention_weights(
                     attn_weight[queryid].cpu().numpy(),
@@ -154,32 +154,31 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
                     expand_point[queryid, :, ::frame_step].cpu().numpy(),
                     pil_imgs, boxes, queryid, pred_frameids)
                 writer.add_figure(figure, 'Deformable DETR encoder-decoder multi-head attention weights', 
-                                  obj_counter)
+                                  obj_counter + obj_num * cur_epoch)
                 obj_counter += 1
         
     elif 'dec_attn_weights' in attn_dict.keys():
         attn_weights = attn_dict['dec_attn_weights']
-        h, w = attn_dict['conv_features'].shape[-2:]
         for attn_weight, (key, value) in zip(attn_weights, results.items()):
             sequence_parser, _ = base_ds(key)
             
             pred_scores = value['scores'] # n t
+            # get mask of query above threshold and less than two elements are True in T dim.
+            mask = (pred_scores > logit_threshold).sum(-1) > 2 # n
+            pred_queryids = torch.nonzero(mask, as_tuple=True)[0].cpu().numpy() # n
+            pred_boxes = value['boxes'][mask].cpu().numpy()[:, ::frame_step]
             pred_frameids = value['frameids'].cpu().numpy()[::frame_step]
-            # filter less than logit_threshold obj 
-            obj_index = torch.nonzero(pred_scores > logit_threshold, as_tuple=True)[0]
-            pred_scores = pred_scores[obj_index].cpu().numpy()
-            pred_boxes = value['boxes'][obj_index].cpu().numpy()[:, ::frame_step]
-            pred_queryids = value['queryids'][obj_index].cpu().numpy()
             pil_imgs = sequence_parser.get_images(pred_frameids)
             
             for boxes, queryid in zip(pred_boxes, pred_queryids):
-                if obj_counter > obj_num:
+                if obj_counter >= obj_num:
                     break
-                weight = attn_weight[queryid].view(h, w).cpu().numpy()
+                weights = attn_weight[queryid].cpu().numpy() # t h w
+                scores = pred_scores[queryid].cpu().numpy() # t
                 figure = vis_utils.plot_multi_head_attention_weights(
-                    weight, pil_imgs, boxes, queryid, pred_frameids)
+                    weights, pil_imgs, boxes, queryid, pred_frameids, scores=scores)
                 writer.add_figure(figure, 'DETR encoder-decoder multi-head attention weights', 
-                                  obj_counter)
+                                  obj_counter + obj_num * cur_epoch)
                 obj_counter += 1
     else:
         logger.warning('The dec attn dict has non-understand key.')

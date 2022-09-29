@@ -185,7 +185,7 @@ class TrainMeter(object):
             "dt_net": self.net_timer.seconds(),
             "eta": eta,
             "loss": {name: str(meter) for name, meter in self.meters.items()},
-            "lr": self.lr,
+            "lr": str(self.lr),
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
         }
         logging.log_json_stats(stats)
@@ -206,7 +206,7 @@ class TrainMeter(object):
             "dt_data": self.data_timer.seconds(),
             "dt_net": self.net_timer.seconds(),
             "eta": eta,
-            "lr": self.lr,
+            "lr": str(self.lr),
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
