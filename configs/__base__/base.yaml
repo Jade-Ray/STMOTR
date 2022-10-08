@@ -1,0 +1,96 @@
+# * Train & Eval
+lr:
+  desc: main model learning rate
+  value: 1.0e-4
+lr_backbone:
+  desc: backbone learning rate
+  value: 1.0e-5
+weight_decay:
+  value: 1.0e-4
+clip_max_norm:
+  desc: gradient clipping max norm
+  value: 0.1
+enable_amp:
+  desc: whether to enable automatic mixed precision during training
+  value: true
+auto_resume:
+  desc: whether to auto resume model checkpoint
+  value: true
+resume:
+  desc: the model resume checkpoint
+  value: ''
+rng_seed:
+  value: 42
+epochs:
+  value: 100
+log_period:
+  desc: log period of epochs
+  value: 10
+eval_period:
+  desc: eval period of epochs
+  value: 10
+save_period:
+  desc: save checkpoint period of epochs
+  value: 10
+referred_threshold:
+  desc: the threshold of whether obj is reffered from all query
+  value: 0.5
+
+# * Backbone
+backbone_name:
+  desc: name of backbone
+  value: swin-t
+backbone_pretrained:
+  desc: whether to load pretrained weights
+  value: true
+backbone_pretrained_path:
+  value: 'data/swin_tiny_patch244_window877_kinetics400_1k.pth'
+train_backbone:
+  value: true
+
+# * Dataset Parameters
+dataset_name:
+  value: tunnel
+dataset_path:
+  value: data/Tunnel
+sampling_num:
+  value: 8
+sampling_rate:
+  value: 2
+resize_and_crop_augmentations:
+  value: true
+horizontal_flip_augmentations:
+  value: true
+train_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 480
+    - 512
+train_max_size:
+  desc: max size of random resize of input frames
+  value: 640
+eval_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 800
+eval_max_size:
+  desc: max size of random resize of input frames
+  value: 1333
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: 'output'
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 2
+eval_batch_size:
+  value: 2
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: 'runs'
+board_freq:
+  value: 10

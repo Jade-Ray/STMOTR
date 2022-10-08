@@ -6,6 +6,7 @@ import argparse
 import yaml
 import sys
 import torch
+from pathlib import Path
 
 import utils.checkpoint as cu
 
@@ -75,6 +76,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def load_yaml_config(cfg: dict, config_path: Path):
+    with open(config_path, 'r') as stream:
+        config = yaml.safe_load(stream)
+    config = {k: v['value'] for k, v in config.items()}
+    if '__base__' in config:
+        base_path = config.pop('__base__')
+        cfg = {**config, **cfg}
+        return load_yaml_config(cfg, config_path.parent / base_path)
+    else:
+        return {**config, **cfg}
+
+
 def load_config(args, path_to_config=None):
     """
     Given the arguemnts, load and initialize the configs.
@@ -85,10 +98,7 @@ def load_config(args, path_to_config=None):
     cfg = {}
     # Load config from cfg.
     if path_to_config is not None:
-        with open(path_to_config, 'r') as stream:
-            config = yaml.safe_load(stream)
-        config = {k: v['value'] for k, v in config.items()}
-        cfg = {**cfg, **config}
+        cfg = load_yaml_config(cfg, Path(path_to_config))
     # Load config from command line, overwrite config from opts.
     if args.opts is not None:
         for key, value in zip(args.opts[0::2], args.opts[1::2]):

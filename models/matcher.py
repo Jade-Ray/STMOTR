@@ -14,7 +14,8 @@ class HungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_is_referred: float = 1, cost_bbox: float = 1, cost_giou: float = 1):
+    def __init__(self, cost_is_referred: float = 1, cost_bbox: float = 1, cost_giou: float = 1,
+                 referred_focal_loss: bool = False):
         """Creates the matcher
 
         Params:
@@ -27,6 +28,10 @@ class HungarianMatcher(nn.Module):
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
         assert cost_is_referred != 0 or cost_bbox != 0 or cost_giou != 0, "all costs cant be 0"
+        if referred_focal_loss:
+            self.compute_is_referred_cost = compute_is_referred_cost_with_focal_loss
+        else:
+            self.compute_is_referred_cost = compute_is_referred_cost
     
     @torch.inference_mode()
     def forward(self, outputs, targets):
@@ -62,7 +67,7 @@ class HungarianMatcher(nn.Module):
         tgt_bbox = torch.cat([v["boxes"] for v in targets]) # [all_batch_num_target_boxes, t, 4]
         
         # Compute the soft-tokens cost:
-        cost_is_referred = compute_is_referred_cost(outputs, targets) # [batch_size * num_queries, all_batch_num_target_boxes]
+        cost_is_referred = self.compute_is_referred_cost(outputs, targets) # [batch_size * num_queries, all_batch_num_target_boxes]
 
         # Compute the distance cost between boxes of tracks
         cost_bbox = track_distance(out_bbox, tgt_bbox, tgt_referred, mode='mean') # [batch_size * num_queries, all_batch_num_target_boxes]
@@ -103,5 +108,23 @@ def compute_is_referred_cost(outputs, targets):
     return cost_is_referred
 
 
-def build_matcher(args):
-    return HungarianMatcher(cost_is_referred=args.set_cost_is_referred, cost_bbox=args.set_cost_bbox, cost_giou=args.set_cost_giou)
+def compute_is_referred_cost_with_focal_loss(outputs, targets):
+    pred_is_referred = outputs['pred_is_referred'].flatten(1, 2).sigmoid(dim=-1)  # [t, b*nq, 2]
+    nq = pred_is_referred.shape[1]
+    target_is_referred_o = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
+    target_is_referred_o = target_is_referred_o[:, None].expand(-1, nq, -1) # [t, b*nq, num_tra]
+    
+    alpha = 0.25
+    gamma = 2.0
+    neg_cost_refer = (1 - alpha) * (pred_is_referred ** gamma) * (-(1 - pred_is_referred + 1e-8).log())
+    pos_cost_refer = alpha * ((1 - pred_is_referred) ** gamma) * (-(pred_is_referred + 1e-8).log())
+    cost_refer = (torch.gather(pos_cost_refer, 2, target_is_referred_o) - torch.gather(
+        neg_cost_refer, 2, target_is_referred_o)).mean(dim=0)
+
+    return cost_refer
+
+
+def build_matcher(args, referred_focal_loss: bool = False):
+    return HungarianMatcher(
+        cost_is_referred=args.set_cost_is_referred, cost_bbox=args.set_cost_bbox, 
+        cost_giou=args.set_cost_giou, referred_focal_loss=referred_focal_loss)

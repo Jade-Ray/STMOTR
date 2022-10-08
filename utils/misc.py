@@ -190,3 +190,10 @@ def nested_tensor_from_videos_list(videos_list: List[Tensor]):
         vid_pad_m[:vid_frames.shape[0], :vid_frames.shape[2], :vid_frames.shape[3]] = False
     # transpose the temporal and batch dims and create a NestedTensor:
     return NestedTensor(padded_videos.transpose(0, 1), videos_pad_masks.transpose(0, 1))
+
+
+def inverse_sigmoid(x, eps=1e-5):
+    x = x.clamp(min=0, max=1)
+    x1 = x.clamp(min=eps)
+    x2 = (1 - x).clamp(min=eps)
+    return torch.log(x1/x2)

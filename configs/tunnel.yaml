@@ -1,131 +1,24 @@
+__base__: 
+  desc: the base config yaml
+  value: __base__/mmotr.yaml
+
 # * Train & Eval
-lr:
-  desc: main model learning rate
-  value: 1.0e-4
-lr_backbone:
-  desc: backbone learning rate
-  value: 1.0e-5
-weight_decay:
-  value: 1.0e-4
-clip_max_norm:
-  desc: gradient clipping max norm
-  value: 0.1
-enable_amp:
-  desc: whether to enable automatic mixed precision during training
-  value: true
-auto_resume:
-  desc: whether to auto resume model checkpoint
-  value: true
 resume:
   desc: the model resume checkpoint
   value: ''
-rng_seed:
-  value: 42
 epochs:
   value: 100
-log_period:
-  desc: log period of epochs
-  value: 10
-eval_period:
-  desc: eval period of epochs
-  value: 10
-save_period:
-  desc: save checkpoint period of epochs
-  value: 10
-referred_threshold:
-  desc: the threshold of whether obj is reffered from all query
-  value: 0.5
-
-# * Backbone
-backbone_name:
-  desc: name of backbone
-  value: swin-t
-backbone_pretrained:
-  desc: whether to load pretrained weights
-  value: true
-backbone_pretrained_path:
-  value: 'data/swin_tiny_patch244_window877_kinetics400_1k.pth'
-train_backbone:
-  value: true
 
 # * Transformer
-num_encoder_layers:
-  desc: Number of encoding layers in the transformer
-  value: 3
-num_decoder_layers:
-  desc: Number of decoding layers in the transformer
-  value: 3
-dim_feedforward:
-  desc: Intermediate size of the feedforward layers in the transformer blocks
-  value: 2048
-d_model:
-  desc: Size of the embeddings (dimension of the transformer)
-  value: 256
-dropout:
-  desc: Dropout applied in the transformer
-  value: 0.1
-nheads:
-  desc: Number of attention heads inside the transformer's attentions
-  value: 8
 num_queries:
   desc: Number of query slots
   value: 50
-
-# * Loss
-aux_loss:
-  desc: enable auxiliary decoding losses (loss at each layer)
-  value: false
-
-# * Matcher
-set_cost_is_referred:
-  desc: soft tokens coefficient in the matching cost
-  value: 2
-set_cost_bbox:
-  desc: bbox giou l1 coefficient in the matching cost
-  value: 5
-set_cost_giou:
-  desc: bboxes giou coefficient in the matching cost
-  value: 1
-
-# * Loss coefficients
-is_referred_loss_coef:
-  value: 2
-boxes_loss_coef:
-  value: 5
-giou_loss_coef:
-  value: 1
-eos_coef:
-  desc: Relative classification weight of the no-object class
-  value: 0.3
 
 # * Dataset Parameters
 dataset_name:
   value: tunnel
 dataset_path:
   value: data/Tunnel
-sampling_num:
-  value: 8
-sampling_rate:
-  value: 2
-resize_and_crop_augmentations:
-  value: true
-horizontal_flip_augmentations:
-  value: true
-train_short_size:
-  desc: size of shorter edge of input frames
-  value: 360
-train_max_size:
-  desc: max size of longer edge of input frames
-  value: 640
-eval_short_size:
-  desc: size of shorter edge of input frames
-  value: 360
-eval_max_size:
-  desc: max size of longer edge of input frames
-  value: 640
-output_dir:
-  desc: path where to save, keep empty for an auto-generated date-time labeled folder
-  value: 'output'
 num_workers:
   desc: number of workers to load data
   value: 4

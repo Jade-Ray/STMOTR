@@ -39,13 +39,12 @@ class VideoSwinTransformerBackbone(nn.Module):
         
         vid_embeds = self.patch_embed(vid_frames)
         vid_embeds = self.pos_drop(vid_embeds)
+        outputs = []
         for layer in self.layers:
             vid_embeds = layer(vid_embeds.contiguous())
-        output = rearrange(vid_embeds, 'b c t h w -> b t h w c')
-        output = self.norm(output)
-        output = rearrange(output, 'b t h w c -> t b c h w')
-        output = nested_tensor_from_ori_mask(output, samples.mask)
-        return output
+            output = rearrange(vid_embeds, 'b c t h w -> t b c h w')
+            outputs.append(nested_tensor_from_ori_mask(output, samples.mask))
+        return outputs
         
     def num_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

@@ -129,9 +129,9 @@ class Tunnel(Dataset):
 
 class TunnelTransforms:
     def __init__(self, subset_type, horizontal_flip_augmentations, resize_and_crop_augmentations,
-                 train_short_size, train_max_size, eval_short_size, eval_max_size, **kwargs):
+                 train_size_list, train_max_size, eval_size_list, eval_max_size, **kwargs):
         normalize = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        scales = [train_short_size]  # size is slightly smaller than eval size below to fit in GPU memory
+        scales = train_size_list  # size is slightly smaller than eval size below to fit in GPU memory
         transforms = []
         if horizontal_flip_augmentations and subset_type == 'train':
             transforms.append(T.RandomHorizontalFlip())
@@ -139,7 +139,9 @@ class TunnelTransforms:
             if subset_type == 'train':
                 transforms.append(T.RandomResize(scales, max_size=train_max_size))
             elif subset_type == 'valid' or subset_type == 'test':
-                transforms.append(T.RandomResize([eval_short_size], max_size=eval_max_size)),
+                transforms.append(T.RandomResize(eval_size_list, max_size=eval_max_size))
+            else:
+                raise ValueError(f'No {subset_type} transform strategy.')
         transforms.extend([T.ToTensor(), normalize])
         self.transforms = T.Compose(transforms)
     

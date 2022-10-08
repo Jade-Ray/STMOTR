@@ -8,8 +8,9 @@ from utils.box_ops import box_cxcywh_to_xyxy
 
 
 class BasePostProcess(nn.Module):
-    def __init__(self):
+    def __init__(self, referred_sigmoid=False):
         super(BasePostProcess, self).__init__()
+        self.referred_sigmoid = referred_sigmoid
     
     @torch.inference_mode()
     def forward(self, outputs, orig_sample_sizes):
@@ -20,7 +21,10 @@ class BasePostProcess(nn.Module):
             orig_sample_sizes: original size [batch_size, 2] of the samples (no augmentations or padding).
         """
         pred_is_referred = outputs['pred_is_referred'] # [T, B, N, 2]
-        prob = rearrange(pred_is_referred, 't b n c -> b n t c').softmax(-1) # [B, N, T, 2]
+        if self.referred_sigmoid:
+            prob = rearrange(pred_is_referred, 't b n c -> b n t c').sigmoid() # [B, N, T, 2]
+        else:
+            prob = rearrange(pred_is_referred, 't b n c -> b n t c').softmax(-1) # [B, N, T, 2]
         scores = prob[..., 1] # [B, N, T]
         
         pred_boxes = outputs["pred_boxes"] # [T, B, N, 4]

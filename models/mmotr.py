@@ -25,7 +25,7 @@ class MMOTR(nn.Module):
         self.aux_loss = aux_loss
         
     def forward(self, samples: NestedTensor):
-        backbone_output = self.backbone(samples) # t b c h w
+        backbone_output = self.backbone(samples)[-1] # t b c h w
         vid_embeds, vid_pad_mask = backbone_output.decompose()
         
         T, B, _, _, _ = vid_embeds.shape
@@ -41,11 +41,10 @@ class MMOTR(nn.Module):
         
         outputs_is_referred = self.is_referred_head(hs)  # [L, T, B, N, 2]
         outputs_coords = self.box_head(hs) # [L, T, B, N, 4]
-        outputs_coords = outputs_coords.sigmoid()
         
         layer_outputs = []
         for pb, pir in zip(outputs_coords, outputs_is_referred):
-            layer_out = {'pred_boxes': pb,
+            layer_out = {'pred_boxes': pb.sigmoid(),
                          'pred_is_referred': pir}
             layer_outputs.append(layer_out)
         out = layer_outputs[-1]  # the output for the last decoder layer is used by default
@@ -84,7 +83,9 @@ def build(args):
             aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
-    criterion = SetCriterion(matcher=matcher, weight_dict=weight_dict, eos_coef=args.eos_coef)
+    criterion = SetCriterion(
+        matcher=matcher, weight_dict=weight_dict, eos_coef=args.eos_coef, alpha=args.alpha,
+        gamma=args.gamma, referred_loss_type='softmax_focal_loss')
     if args.dataset_name == 'tunnel':
         postprocessor = BasePostProcess()
     elif args.dataset_name == 'ua':
