@@ -5,6 +5,9 @@ __base__:
 model_name:
   desc: name of model
   value: deformable_mmotr
+enable_amp:
+  desc: whether to enable automatic mixed precision during training
+  value: false
 
 # * Deformable Transformer
 num_encoder_layers:

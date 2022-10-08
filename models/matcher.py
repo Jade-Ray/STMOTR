@@ -109,7 +109,7 @@ def compute_is_referred_cost(outputs, targets):
 
 
 def compute_is_referred_cost_with_focal_loss(outputs, targets):
-    pred_is_referred = outputs['pred_is_referred'].flatten(1, 2).sigmoid(dim=-1)  # [t, b*nq, 2]
+    pred_is_referred = outputs['pred_is_referred'].flatten(1, 2).sigmoid()  # [t, b*nq, 2]
     nq = pred_is_referred.shape[1]
     target_is_referred_o = torch.cat([v['referred'] for v in targets]).long().transpose(0, 1) # [t, num_tra]
     target_is_referred_o = target_is_referred_o[:, None].expand(-1, nq, -1) # [t, b*nq, num_tra]

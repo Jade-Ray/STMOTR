@@ -1,0 +1,51 @@
+__base__: 
+  desc: the base config yaml
+  value: __base__/deformable_mmotr.yaml
+
+# * Train & Eval
+epochs:
+  value: 50
+
+# * Transformer
+num_queries:
+  desc: Number of query slots
+  value: 100
+
+# * Dataset Parameters
+dataset_name:
+  value: ua
+dataset_path:
+  value: data/UA_DETRAC
+train_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 480
+    - 512
+train_max_size:
+  desc: max size of random resize of input frames
+  value: 640
+eval_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 800
+eval_max_size:
+  desc: max size of random resize of input frames
+  value: 1333
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/demmotr_ua
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 2
+eval_batch_size:
+  value: 1
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: runs/demmotr_ua
+board_freq:
+  value: 10

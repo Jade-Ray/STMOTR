@@ -137,7 +137,8 @@ class SetCriterion(nn.Module):
         target_is_referred_o = torch.cat([t["referred"][J] for t, (_, J) in zip(targets, indices)]) # [batch_obj_num, T]
         target_is_referred[idx] = target_is_referred_o.long() # [B, N, T]
         
-        target_onehot = torch.zeros((B, N, T, 2), dtype=torch.int64,
+        target_onehot = torch.zeros((B, N, T, 2), dtype=pred_is_referred.dtype,
+                                    layout=pred_is_referred.layout, 
                                     device=pred_is_referred.device)
         target_onehot.scatter_(3, target_is_referred.unsqueeze(-1), 1)
         

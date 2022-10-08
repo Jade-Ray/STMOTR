@@ -84,9 +84,10 @@ class DeformableMMOTR(nn.Module):
         outputs_coords = self.box_head(hs) # [L, T, B, N, 4]
         
         layer_outputs = []
-        for pb, pir, ref in zip(outputs_coords, outputs_is_referred, inter_references):
+        for i in range(len(hs)):
+            pb, pir = outputs_coords[i], outputs_is_referred[i]
             # outputs_coord is formmed (cx, cy, w, h)
-            reference = inverse_sigmoid(ref)
+            reference = inverse_sigmoid(inter_references[i])
             assert reference.shape[-1] == 2
             pb[..., :2] += reference
             layer_out = {'pred_boxes': pb.sigmoid(),
