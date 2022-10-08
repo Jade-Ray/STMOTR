@@ -1,0 +1,46 @@
+__base__: 
+  desc: the base config yaml
+  value: __base__/deformable_mmotr.yaml
+
+# * Train & Eval
+resume:
+  desc: the model resume checkpoint
+  value: ''
+auto_resume:
+  desc: whether to auto resume model checkpoint
+  value: false
+epochs:
+  value: 100
+
+# * Transformer
+num_queries:
+  desc: Number of query slots
+  value: 50
+
+# * Dataset Parameters
+dataset_name:
+  value: tunnel
+dataset_path:
+  value: data/Tunnel
+eval_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 360
+eval_max_size:
+  desc: max size of random resize of input frames
+  value: 640
+num_workers:
+  desc: number of workers to load data
+  value: 1
+batch_size:
+  value: 1
+eval_batch_size:
+  value: 1
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: runs/demmotr_tunnel
+board_freq:
+  value: 10

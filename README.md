@@ -12,3 +12,9 @@ conda install -c conda-forge opencv matplotlib scipy pandas psutil tqdm simplejs
 
 pip install tensorboard moviepy
 ```
+
+- If the usage of deformableDETR, you should install `CUDA Functions of Multi-Scale Deformable Attention`
+
+```shell
+pip install MultiScaleDeformableAttention
+```

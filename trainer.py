@@ -363,15 +363,41 @@ class Trainer:
         self.model.eval()
         
         if vis_ablation:
-            conv_features, dec_attn_weights = [], []
-            hooks = [
-                self.model.transformer.register_forward_hook(
-                    lambda self, input, output: conv_features.append(input[0]) # t b c h w
-                ),
-                self.model.transformer.decoder.layers[-1].multihead_attn.register_forward_hook(
-                    lambda self, input, output: dec_attn_weights.append(output[1])  # (t b) q (h w)
-                )
-            ]
+            if self.model._get_name() == 'DeformableMMOTR':
+                spatial_shapes, point_offsets, dec_attn_weights = [], [], []
+                reference_points, embed_points = [], []
+                
+                def referPoints_hook(module, input, output):
+                    reference_points.append(input[1])
+                    spatial_shapes.append(input[3])
+                
+                hooks = [
+                    self.model.transformer.decoder.layers[-1].cross_attn.register_forward_hook(
+                        referPoints_hook
+                    ),
+                    self.model.transformer.decoder.layers[-1].cross_attn.sampling_offsets.register_forward_hook(
+                        lambda self, input, output: point_offsets.append(output)
+                    ),
+                    self.model.transformer.decoder.layers[-1].cross_attn.attention_weights.register_forward_hook(
+                        lambda self, input, output: dec_attn_weights.append(output)  
+                    ),
+                    self.model.box_head.layers[-1].register_forward_hook(
+                        lambda self, input, output: embed_points.append(output[-1])
+                    )
+                ]
+            elif self.model._get_name() == 'MMOTR':
+                conv_features, dec_attn_weights = [], []
+                hooks = [
+                    self.model.transformer.register_forward_hook(
+                        lambda self, input, output: conv_features.append(input[0]) # t b c h w
+                    ),
+                    self.model.transformer.decoder.layers[-1].multihead_attn.register_forward_hook(
+                        lambda self, input, output: dec_attn_weights.append(output[1])  # (t b) q (h w)
+                    )
+                ]
+            else:
+                logger.warning(f'Not supported Ablation transformer model {cfg.TRANSFORMER.NAME}')
+                hooks = []
         
         for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
             # visualization input images
@@ -416,10 +442,37 @@ class Trainer:
             
             # visualization ablation images
             if self.writer is not None and vis_ablation:
-                t, b, _, h, w = conv_features[-1].shape
-                attn_dict = {
-                    'dec_attn_weights': rearrange(dec_attn_weights[-1], '(t b) q (h w) -> b q t h w', t=t, b=b, h=h, w=w),
-                    'conv_features': rearrange(conv_features[-1], 't b c h w -> b t c h w')} 
+                if self.model._get_name() == 'DeformableMMOTR':
+                    t, b = embed_points[-1].shape[:2]
+                    nlevels, nheads, npoints = self.model.feature_levels, self.model.nheads, self.model.npoints
+                    # calculate weights for every level to [bs, lq, t, nh, nl, np]:
+                    attn_weights = rearrange(dec_attn_weights[-1], '(t b) q (h l p) -> b q t h (l p)',
+                                             t=t, b=b, h=nheads, l=nlevels, p=npoints)
+                    attn_weights = rearrange(attn_weights.softmax(-1), 'b q t h (l p) -> b q t h l p', l=nlevels, p=npoints)
+                    # calculate attn points for every level to [bs, lq, t, nh, nl, np, 2]:
+                    offsets = rearrange(point_offsets[-1], '(t b) q (h l p c) -> b q t h l p c',
+                                        t=t, b=b, h=nheads, l=nlevels, p=npoints, c=2)
+                    offset_normalizer = torch.stack([spatial_shapes[-1][..., 1], spatial_shapes[-1][..., 0]], -1) # (h, w) to (w, h)
+                    reference_points = rearrange(reference_points[-1], '(t b) q l c -> b q t l c', t=t, b=b)
+                    attn_points = reference_points[:, :, :, None, :, None, :] \
+                        + offsets / offset_normalizer[None, None, None, None, :, None, :]
+                    # calculate expand points for every frame to [bs, lq, t, nh, nl, np, 2] formed (cx, xy)
+                    expand_points = misc.inverse_sigmoid(attn_points) \
+                        + rearrange(embed_points[-1], 't b q c -> b q t c')[:, :, :, None, None, None, :2]
+                    
+                    attn_dict = {'dec_attn_weights': attn_weights,
+                                'attn_points': attn_points.clamp(min=0, max=1),
+                                'reference_points': reference_points,
+                                'spatial_shapes': offset_normalizer,
+                                'expand_points': expand_points.sigmoid()}
+                    
+                elif self.model._get_name() == 'MMOTR':
+                    t, b, _, h, w = conv_features[-1].shape
+                    attn_dict = {
+                        'dec_attn_weights': rearrange(dec_attn_weights[-1], '(t b) q (h w) -> b q t h w', t=t, b=b, h=h, w=w),
+                        'conv_features': rearrange(conv_features[-1], 't b c h w -> b t c h w')} 
+                else:
+                    attn_dict = {}
                 tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
                                   self.val_meter.base_ds, cur_epoch=cur_iter)
             

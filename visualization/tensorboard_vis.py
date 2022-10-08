@@ -8,7 +8,7 @@ import numpy as np
 from scipy import interpolate, integrate
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.utils import make_grid
+from einops import rearrange
 
 import utils.logging as logging
 import visualization.utils as vis_utils
@@ -123,36 +123,30 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
                    logit_threshold=0.2):
     obj_counter = 0
     if 'attn_points' in attn_dict.keys():
-        N, Q, Nh, Nl, Np = attn_dict['dec_attn_weights'].shape
-        attn_weights = attn_dict['dec_attn_weights'].transpose(2, 3).reshape(N, Q, Nl, -1)
-        attn_points = attn_dict['attn_points'].transpose(2, 3).reshape(N, Q, Nl, -1, 2) * attn_dict['spatial_shapes'][None, None, :, None, :]
-        refer_points = attn_dict['reference_points'] * attn_dict['spatial_shapes'][None, None, :, :]
-        expand_points = attn_dict['expand_points'].permute(0,1,3,5,2,4,6).reshape(N, Q, Nl, -1, Nh*Np, 2)
-        for attn_weight, attn_point, refer_point, expand_point, (key, value) in zip \
-            (attn_weights, attn_points, refer_points, expand_points, results.items()):
+        for i, (key, value) in enumerate(results.items()):
             sequence_parser, _ = base_ds(key)
-            
-            pred_scores = value['scores']
+            pred_scores = value['scores'] # n t
+            # get mask of query above threshold and less than two elements are True in T dim.
+            mask = (pred_scores > logit_threshold).sum(-1) > 2 # n
+            pred_queryids = torch.nonzero(mask, as_tuple=True)[0].cpu().numpy() # n
+            pred_boxes = value['boxes'][mask].cpu().numpy()[:, ::frame_step]
             pred_frameids = value['frameids'].cpu().numpy()[::frame_step]
-            # filter less than logit_threshold obj 
-            obj_index = torch.nonzero(pred_scores > logit_threshold, as_tuple=True)[0]
-            pred_scores = pred_scores[obj_index].cpu().numpy()
-            pred_boxes = value['boxes'][obj_index].cpu().numpy()[:, ::frame_step]
-            pred_queryids = value['queryids'][obj_index].cpu().numpy()
             pil_imgs = sequence_parser.get_images(pred_frameids)
-            expand_point *= torch.tensor([sequence_parser.imWidth, sequence_parser.imHeight],
-                                         device=expand_point.device)
+            img_size = torch.tensor([sequence_parser.imWidth, sequence_parser.imHeight],
+                                    device=mask.device)
             
             for boxes, queryid in zip(pred_boxes, pred_queryids):
                 if obj_counter >= obj_num:
                     break
-                figure = vis_utils.plot_deformable_attention_weights(
-                    attn_weight[queryid].cpu().numpy(),
-                    attn_point[queryid].cpu().numpy(),
-                    attn_dict['spatial_shapes'].cpu().numpy(),
-                    refer_point[queryid].cpu().numpy(),
-                    expand_point[queryid, :, ::frame_step].cpu().numpy(),
-                    pil_imgs, boxes, queryid, pred_frameids)
+                attn_weight = rearrange(attn_dict['dec_attn_weights'][i, queryid],
+                                        't h l p -> t l (h p)')
+                attn_point = rearrange(attn_dict['expand_points'][i, queryid, ::frame_step], 
+                                       't h l p c -> t l (h p) c') * img_size
+                refer_point = attn_dict['reference_points'][i, queryid, ::frame_step] * img_size
+                
+                figure = vis_utils.plot_deformable_lvl_attn_weights(
+                    attn_weight.cpu().numpy(), attn_point.cpu().numpy(),
+                    refer_point.cpu().numpy(), pil_imgs, boxes, pred_frameids)
                 writer.add_figure(figure, 'Deformable DETR encoder-decoder multi-head attention weights', 
                                   obj_counter + obj_num * cur_epoch)
                 obj_counter += 1

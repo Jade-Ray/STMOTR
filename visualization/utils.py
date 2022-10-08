@@ -2,6 +2,7 @@ import warnings
 from typing import List
 from PIL import Image
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 import torch
 from torch import Tensor
@@ -184,15 +185,15 @@ def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: List[Im
     return fig
 
 
-def plot_deformable_attention_weights(attn_weights: np.ndarray, attn_points: np.ndarray,
+def plot_deformable_attn_weights(attn_weights: np.ndarray, attn_points: np.ndarray,
                                       spatial_shapes: np.ndarray,
                                       refer_points: np.ndarray, expand_points: np.ndarray, 
                                       pil_imgs: List[Image.Image], boxes: np.ndarray, 
                                       query_id: int, frame_ids: np.ndarray):
     """Visualize Deformable DETR encoder-decoder multi-head attention weights."""
-    assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
-    assert len({len(attn_weights), len(attn_points), len(refer_points), 
-                len(expand_points), len(spatial_shapes)}) == 1
+    # assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
+    # assert len({len(attn_weights), len(attn_points), len(refer_points), 
+    #             len(expand_points), len(spatial_shapes)}) == 1
     ncols, nrows = len(pil_imgs) + 1, len(attn_weights)
     fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 14))
     for nl, (ax_j, weight, point, shape, refer_point, expand_point) in enumerate(zip \
@@ -216,6 +217,34 @@ def plot_deformable_attention_weights(attn_weights: np.ndarray, attn_points: np.
             ax.axis('off')
             ax.set_title(f'frame id: {frameid} // query id: {query_id}')
     fig.tight_layout()
+    return fig
+
+
+def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.ndarray, 
+                                     refer_points: np.ndarray, 
+                                     pil_imgs: List[Image.Image], boxes: np.ndarray, 
+                                     frame_ids: np.ndarray):
+    ncols, nrows = len(pil_imgs), attn_weights.shape[1]
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 14), layout='constrained')
+    for j, ax_j in enumerate(axs):
+        for i, (img, (l, t, r, b)) in enumerate(zip(pil_imgs, boxes)):
+            ax = ax_j[i]
+            ax.imshow(img)
+            ax.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2))
+            sca = ax.scatter(attn_points[i, j, :, 0], attn_points[i, j, :, 1], 
+                             c=attn_weights[i, j], cmap=colormap,
+                             vmin=0.0, vmax=1.0)
+            ax.plot(refer_points[i, j, 0], refer_points[i, j, 0], 'g+', markersize=8)
+            ax.axis('off')
+            if i == 0:
+                ax.set_ylabel(f'lvl {j+1}')
+            if j == 0:
+                ax.set_title(f'frame {frame_ids[i]}')
+    fig.tight_layout()
+    cbar = fig.colorbar(sca, ax=axs[:, :], shrink=0.7)
+    cbar.set_ticks([0.02, 0.98])
+    cbar.set_ticklabels (['low', 'high'])
     return fig
 
 

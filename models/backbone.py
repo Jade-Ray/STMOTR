@@ -28,7 +28,12 @@ class VideoSwinTransformerBackbone(nn.Module):
         self.patch_embed = swin_backbone.patch_embed
         self.pos_drop = swin_backbone.pos_drop
         self.layers = swin_backbone.layers
-        self.norm = swin_backbone.norm
+        self.downsamples = nn.ModuleList()
+        for layer in self.layers:
+            self.downsamples.append(layer.downsample)
+            layer.downsample = None
+        self.downsamples[-1] = None # downsampling after the last layer is not necessary
+        
         self.train_backbone = train_backbone
         if not train_backbone:
             for parameter in self.parameters():
@@ -40,10 +45,14 @@ class VideoSwinTransformerBackbone(nn.Module):
         vid_embeds = self.patch_embed(vid_frames)
         vid_embeds = self.pos_drop(vid_embeds)
         outputs = []
-        for layer in self.layers:
+        for layer, downsample in zip(self.layers, self.downsamples):
             vid_embeds = layer(vid_embeds.contiguous())
             output = rearrange(vid_embeds, 'b c t h w -> t b c h w')
             outputs.append(nested_tensor_from_ori_mask(output, samples.mask))
+            if downsample:
+                vid_embeds = rearrange(vid_embeds, 'b c t h w -> b t h w c')
+                vid_embeds = downsample(vid_embeds)
+                vid_embeds = rearrange(vid_embeds, 'b t h w c -> b c t h w')
         return outputs
         
     def num_parameters(self):

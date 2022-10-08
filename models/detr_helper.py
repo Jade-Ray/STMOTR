@@ -224,7 +224,7 @@ class DeformableTransformerEncoderLayer(nn.Module):
     def __init__(self,
                  d_model=256, dim_feedforward=1024,
                  dropout=0.1, activation="relu",
-                 nlevels=4, nheads=8, npoints=4):
+                 nlevels=4, nheads=8, npoints=4, **kwargs):
         super().__init__()
 
         # self attention
@@ -296,7 +296,7 @@ class DeformableTransformerEncoder(nn.Module):
 class DeformableTransformerDecoderLayer(nn.Module):
     def __init__(self, d_model=256, dim_feedforward=1024,
                  dropout=0.1, activation="relu",
-                 nlevels=4, nheads=8, npoints=4):
+                 nlevels=4, nheads=8, npoints=4, **kwargs):
         super().__init__()
 
         # cross attention

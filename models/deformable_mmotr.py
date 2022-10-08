@@ -19,11 +19,12 @@ class DeformableMMOTR(nn.Module):
         self.start_level = start_level
         self.backbone_end_level = len(input_num_channels)
         self.feature_levels = self.backbone_end_level - self.start_level + extra_levels
+        self.nheads = kwargs['nheads']
+        self.npoints = kwargs['npoints']
         
         self.transformer = MultimodalDeformableTransformer(
             feature_levels=self.feature_levels, **kwargs)
         d_model = self.transformer.d_model
-        
         
         self.is_referred_head = nn.Linear(d_model, 2)  # binary 'is referred?' prediction head for object queries
         self.box_head = MLP(d_model, d_model, 4, num_layers=2)
@@ -60,11 +61,11 @@ class DeformableMMOTR(nn.Module):
         backbone_outputs = self.backbone(samples) # l t b c h w
         
         vid_embeds, vid_pad_mask = [], []
-        for level in range(self.start_level, self.start_level + self.feature_levels):
-            if level < self.backbone_end_level:
-                src, mask = backbone_outputs[level].decompose()
-            elif level == self.backbone_end_level:
-                src, mask = backbone_outputs[level].decompose()
+        for level in range(self.feature_levels):
+            if level+self.start_level < self.backbone_end_level:
+                src, mask = backbone_outputs[level+self.start_level].decompose()
+            elif level+self.start_level == self.backbone_end_level:
+                src, mask = backbone_outputs[-1].decompose()
             T, B, _, _, _  = src.shape
             src = rearrange(src, 't b c h w -> (t b) c h w')
             src = self.backbone_proj[level](src)
@@ -75,7 +76,7 @@ class DeformableMMOTR(nn.Module):
         
         transformer_out = self.transformer(vid_embeds, vid_pad_mask, self.query_embed.weight)
         # hs is: [L, T, B, N, D] where L is number of decoder layers
-        # vid_memory is: [T, B, D, Lel, H, W]
+        # vid_memory is lev list: [(T, B), (H, W), C]
         # reference_points is [L, T, B, N, 2]
         hs, vid_memory, inter_references = transformer_out
         

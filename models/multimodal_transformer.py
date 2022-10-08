@@ -78,10 +78,6 @@ class MultimodalDeformableTransformer(nn.Module):
         nn.init.xavier_uniform_(self.reference_points.weight.data, gain=1.0)
         nn.init.constant_(self.reference_points.bias.data, 0.)
         nn.init.normal_(self.level_embed)
-        
-        for proj in self.input_proj:
-            nn.init.xavier_uniform_(proj[0].weight, gain=1)
-            nn.init.constant_(proj[0].bias, 0)
     
     def get_valid_ratio(self, mask):
         T, _, H, W = mask.shape
@@ -101,27 +97,27 @@ class MultimodalDeformableTransformer(nn.Module):
             src_flatten.append(rearrange(src, 't b c h w -> (t b) (h w) c'))
             mask_flatten.append(rearrange(mask, 't b h w -> (t b) (h w)'))
             vid_pos_embed = self.pos_encoder_2d(rearrange(mask, 't b h w -> (t b) h w'), self.d_model)
-            lvl_pos_embed_flatten.append(vid_pos_embed + lvl_emb.view(1, 1, -1))
+            lvl_pos_embed_flatten.append(
+                rearrange(vid_pos_embed, 'tb h w c -> tb (h w) c') + lvl_emb.view(1, 1, -1)) # (t b) (h w) c
             
-        src_flatten = torch.cat(src_flatten, 1)
+        src_flatten = torch.cat(src_flatten, 1) # (t b) (l h w) c
         mask_flatten = torch.cat(mask_flatten, 1)
         lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1) 
+        
         spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
         level_start_index = torch.cat((spatial_shapes.new_zeros((1,  )), spatial_shapes.prod(1).cumsum(0)[:-1])) # [lvl]
         valid_ratios = repeat(torch.stack(valid_ratios, 1), 'b l c -> (t b) l c', t=t)
         
         # encoder
         memory = self.encoder(src_flatten, spatial_shapes, level_start_index, valid_ratios, lvl_pos_embed_flatten, mask_flatten) # [T*B, lvl*h*w, C]
-        vid_memory = rearrange(memory, '(t b) (l h w) c -> t b c l h w', 
-                               l=len(src_flatten), h=h, w=w, t=t, b=b)
+        vid_memory = memory.split(list(spatial_shapes.prod(1).cpu().numpy()), dim=1)
         
         # prepare input for encoder
         # add T*B dims to query embeds (was: [N, C], where N is the number of object queries):
         query_embed, tgt = torch.split(obj_queries, self.d_model, dim=1) # [n_q, c]
-        query_embed = repeat(obj_queries, 'n c -> (t b) n c', t=t, b=b)
+        query_embed = repeat(query_embed, 'n c -> (t b) n c', t=t, b=b)
         tgt = repeat(tgt, 'n c -> (t b) n c', t=t, b=b)
-        reference_points = repeat(self.reference_points(query_embed).sigmoid(),
-                                  'b n c -> (t b) n c', t=t)
+        reference_points = self.reference_points(query_embed).sigmoid()
         
         # decoder
         # hs is [L, T*B, N, C] where L is number of layers in the decoder
