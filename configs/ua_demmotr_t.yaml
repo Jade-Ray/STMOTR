@@ -1,0 +1,63 @@
+# The tiny model setting
+__base__: 
+  desc: the base config yaml
+  value: __base__/deformable_mmotr.yaml
+
+# * Train & Eval
+epochs:
+  value: 70
+eval_period:
+  desc: eval period of epochs
+  value: 70
+
+# * Transformer
+num_encoder_layers:
+  desc: Number of encoding layers in the transformer
+  value: 3
+num_decoder_layers:
+  desc: Number of decoding layers in the transformer
+  value: 3
+dim_feedforward:
+  desc: Intermediate size of the feedforward layers in the transformer blocks
+  value: 1024
+num_queries:
+  desc: Number of query slots
+  value: 100
+
+# * Dataset Parameters
+dataset_name:
+  value: ua
+dataset_path:
+  value: data/UA_DETRAC
+train_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 320
+train_max_size:
+  desc: max size of random resize of input frames
+  value: 576
+eval_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 320
+eval_max_size:
+  desc: max size of random resize of input frames
+  value: 576
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/demmotr_ua_t
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 2
+eval_batch_size:
+  value: 4
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: runs/demmotr_ua_t
+board_freq:
+  value: 10

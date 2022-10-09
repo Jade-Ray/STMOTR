@@ -18,3 +18,12 @@ pip install tensorboard moviepy
 ```shell
 pip install MultiScaleDeformableAttention
 ```
+
+## Training
+
+To train on a single machine with 3 gpus for 50 epochs run:
+
+```shell
+export CUDA_VISIBLE_DEVICES=0,1,2
+python main.py --running_mode train --shard_id 0 --num_shards 1 --num_gpus 3 --cfg configs/ua_demmotr_t.yaml
+```
