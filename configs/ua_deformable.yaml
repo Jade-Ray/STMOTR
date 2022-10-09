@@ -9,7 +9,7 @@ epochs:
 # * Transformer
 num_queries:
   desc: Number of query slots
-  value: 100
+  value: 50
 
 # * Dataset Parameters
 dataset_name:

@@ -114,8 +114,8 @@ class SingleVideoParserBase(object):
         selected_track_id = appeared_track_counts[appeared_track_counts >= self.min_valid_node_num].index
         return df[df['track_id'].isin(selected_track_id)]
     
-    def convert2mate(self, df_gt: pd.DataFrame) -> dict:
-        """Generate video mate data from DataFrame."""
+    def convert2mate(self, frame_ids: List[int]) -> dict:
+        """Generate video mate data from frame_ids."""
         raise NotImplementedError
     
     def get_frame_ids(self, item:int):

@@ -26,15 +26,15 @@ class SingleVideoParser(SingleVideoParserBase):
         
         self.gt = df
     
-    def convert2mate(self, df_gt: pd.DataFrame) -> dict:
-        frame_indexes = df_gt['frame_index'].unique()
+    def convert2mate(self, frame_ids) -> dict:
+        df_gt = self.get_gt(frame_ids)
         video_mate = defaultdict(list)
-        video_mate['frame_ids'] = frame_indexes
+        key = ['track_ids', 'labels', 'referred', 'boxes', 'visibilities']
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
             referred, bboxes, vises = [], [], []
-            for i in frame_indexes:
+            for i in frame_ids:
                 if i in track_group['frame_index'].values:
                     referred.append(True)
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
@@ -46,7 +46,8 @@ class SingleVideoParser(SingleVideoParserBase):
             video_mate['referred'].append(np.array(referred))
             video_mate['boxes'].append(np.array(bboxes))
             video_mate['visibilities'].append(np.array(vises))
-        video_mate = {k: np.array(v) for k, v in video_mate.items()}
+        video_mate = {k: np.array(video_mate[k]) for k in key}
+        video_mate['frame_ids'] = frame_ids
         video_mate['orig_size'] = (self.imWidth, self.imHeight)
         video_mate['video_name'] = self.sequence_name
         return video_mate   
@@ -61,8 +62,7 @@ class SingleVideoParser(SingleVideoParserBase):
         # padding empty object if no obj in selected_frame
         frame_ids = self._get_sampling_frame_ids(item)
         images = self.get_images(frame_ids)
-        video_mate = self.convert2mate(self.get_gt(frame_ids))
-        assert len({len(images), video_mate['boxes'].shape[1], video_mate['referred'].shape[1]}) == 1
+        video_mate = self.convert2mate(frame_ids)
         
         return images, video_mate
 

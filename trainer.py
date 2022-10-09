@@ -75,7 +75,7 @@ class Trainer:
              "lr": cfg.lr_backbone},
         ]
         self.optimizer = torch.optim.AdamW(param_dicts, lr=cfg.lr, weight_decay=cfg.weight_decay)
-        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=[50], gamma=0.4, verbose=True)
+        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=[40], gamma=0.4, verbose=True)
         self.grad_scaler = amp.GradScaler(enabled=cfg.enable_amp)
         self.max_norm = cfg.clip_max_norm
         
@@ -396,7 +396,7 @@ class Trainer:
                     )
                 ]
             else:
-                logger.warning(f'Not supported Ablation transformer model {cfg.TRANSFORMER.NAME}')
+                logger.warning(f'Not supported Ablation transformer model {self.model._get_name()}')
                 hooks = []
         
         for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
