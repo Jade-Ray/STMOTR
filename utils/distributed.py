@@ -1,3 +1,5 @@
+import datetime
+
 import torch
 import torch.distributed as dist
 
@@ -35,9 +37,11 @@ def init_process_group(
     dist.init_process_group(
         backend=dist_backend,
         init_method=init_method,
+        timeout=datetime.timedelta(seconds=20),
         world_size=world_size,
         rank=proc_rank,
     )
+    dist.barrier(device_ids=[local_rank])
 
 
 def is_master_proc(num_gpus=8):
@@ -99,7 +103,7 @@ def init_distributed_training(cfg):
             range(i * num_gpus_per_machine, (i + 1) * num_gpus_per_machine)
         )
         pg = dist.new_group(ranks_on_i)
-        if i == cfg.SHARD_ID:
+        if i == cfg.shard_id:
             global _LOCAL_PROCESS_GROUP
             _LOCAL_PROCESS_GROUP = pg
 

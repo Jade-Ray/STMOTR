@@ -60,7 +60,7 @@ class Trainer:
                 module=model,
                 device_ids=[cur_device],
                 output_device=cur_device,
-                find_unused_parameters=False,)
+                find_unused_parameters=True,)
         if self.is_master_proc:
             misc.log_model_info(model)
         self.model = model

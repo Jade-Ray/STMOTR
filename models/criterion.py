@@ -67,8 +67,9 @@ class SetCriterion(nn.Module):
 
         # Compute the average number of target boxes across all nodes, for normalization purposes
         num_tracks = sum(len(t["boxes"]) for t in targets)
-        num_tracks = torch.as_tensor([num_tracks], dtype=torch.float, device=indices[0][0].device)
-        if du.get_rank() > 0:
+        num_tracks = torch.as_tensor([num_tracks], dtype=torch.float, 
+                                     device=next(iter(outputs.values())).device)
+        if du.is_dist_avail_and_initialized() > 0:
             torch.distributed.all_reduce(num_tracks)
         num_tracks = torch.clamp(num_tracks / du.get_world_size(), min=1).item()
 
