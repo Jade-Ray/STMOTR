@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument(
         "--init_method",
         help="Initialization method, includes TCP or shared file-system",
-        default="tcp://localhost:9999",
+        default="tcp://127.0.0.1:12356",
         type=str,
     )
     parser.add_argument(
