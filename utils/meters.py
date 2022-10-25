@@ -338,14 +338,17 @@ class MotValMeter(object):
             self.meters[sequence_name].gt = sequence_parser.gt
         frame_ids = sequence_parser.get_frame_ids(sequence_item)
         sampling_frame_ids = sequence_parser._get_sampling_frame_ids(sequence_item)
-        sequence_imgs = sequence_parser.get_images(frame_ids)
-        sequence_mate = sequence_parser.convert2mate(sequence_parser.get_gt(frame_ids))
-        return {'name': sequence_name,
+        sequence_imgs = sequence_parser.get_images(frame_ids, opacity=0.75)
+        sequence_mate = sequence_parser.convert2mate(frame_ids)
+        info = {'name': sequence_name,
                 'item': sequence_item,
                 'frame_ids': frame_ids,
                 'sampling_frame_ids': sampling_frame_ids,
                 'imgs': sequence_imgs,
                 'mate': sequence_mate}
+        if 'ignored_region' in sequence_parser.__dict__:
+            info.update({'ignored_region': sequence_parser.ignored_region})
+        return info
     
     def get_sequence_data(self, sequence_name, sequence_item):
         """Get sequence item Mot pred data from sequence name moteval"""

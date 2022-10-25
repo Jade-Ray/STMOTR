@@ -1,7 +1,9 @@
 # The tiny model setting
 __base__: 
   desc: the base config yaml
-  value: __base__/deformable_mmotr.yaml
+  value: 
+    - __base__/deformable_mmotr.yaml
+    - __base__/ablation.yaml
 
 # * Train & Eval
 epochs:
@@ -67,3 +69,27 @@ board_dir:
   value: runs/demmotr_ua_t
 board_freq:
   value: 10
+
+# * Tensorboard Ablation
+# should enable Tensorboard first
+board_vis_input_enable:
+  desc: Visualization of dataloader input and ground truth 
+  value: true
+board_vis_mid_enable:
+  desc: Visualization of mid result (video sequence output)
+  value: true
+board_vis_res_enable:
+  desc: Visualization of finally result (merge all video sequences output)
+  value: true
+board_vis_res_save:
+  value: true
+board_vis_ablation_enable:
+  desc: Visualization of attention ablation of DETR of DeformableDETR
+  value: false
+board_vis_item:
+  desc: Visualization of dataloader item list, -1 means all
+  value:
+    - 0
+    - 1
+    - 46
+    - 47

@@ -12,7 +12,8 @@ from einops import rearrange
 
 import utils.logging as logging
 import visualization.utils as vis_utils
-
+        
+log.getLogger('torch.utils.tensorboard.summary').setLevel(log.ERROR)
 log.getLogger('PIL').setLevel(log.WARNING)
 log.getLogger("matplotlib").setLevel(log.ERROR)
 
@@ -69,7 +70,7 @@ class TensorboardWriter(object):
             global_step(Optional[int]): current step.
             fps (int): frames per second.
         """
-        self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps)
+        self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps) 
     
     def add_text(self, tag, text_string, global_step=None, walltime=None):
         """Add text data to summary.

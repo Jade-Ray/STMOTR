@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from PIL import Image
+from PIL import Image, ImageDraw
 import xml.etree.ElementTree as ET
 
 import torch
@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 from datasets.video_parse import SingleVideoParserBase
 import datasets.transforms as T
 from utils.misc import nested_tensor_from_videos_list
+from utils.box_ops import box_xywh_to_xyxy, box_iou
 
 
 class IgnoredRegion():
@@ -21,63 +22,14 @@ class IgnoredRegion():
         ignored_regions (list[tuple]): The Ignored Region format is the list and a rectangle (x, y, w, h) in item.
         threshold (float): The threshold `(0.~1.)` of iou to detect weather obj in ignored_regions, 0 is overlap, 1 is non-overlap.
     """
-    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.5):
+    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.25):
         self.ignored_regions = ignored_regions
         self.threshold = threshold
     
     @property
-    def regions(self):
+    def regions(self) -> np.ndarray:
         """Return a ignored region list with rectangle (x, y, w, h)"""
-        return self.ignored_regions
-    
-    def _rect_min_max(self, r):
-        """from xywh to xyxy"""
-        min_pt = r[..., :2]
-        size = r[..., 2:]
-        max_pt = min_pt + size
-        return min_pt, max_pt
-    
-    def _boxiou(self, a, b):
-        """Computes IOU of two rectangles."""
-        a_min, a_max = self._rect_min_max(a)
-        b_min, b_max = self._rect_min_max(b)
-        # Compute intersection.
-        i_min = np.maximum(a_min, b_min)
-        i_max = np.minimum(a_max, b_max)
-        i_size = np.maximum(i_max - i_min, 0)
-        i_vol = np.prod(i_size, axis=-1)
-        # Get volume of just a.
-        a_size = np.maximum(a_max - a_min, 0)
-        a_vol = np.prod(a_size, axis=-1)
-        u_vol = a_vol
-        return np.where(i_vol == 0, np.zeros_like(i_vol, dtype=np.float),
-                        np.true_divide(i_vol, u_vol))
-    
-    def _iou_matrix(self, objs, hyps, max_iou=1.):
-        """Computes 'intersection over union (IoU)' distance matrix between object and hypothesis rectangles. Just in hyps area more bigger than objs situation.
-        
-        The custom IoU just compute objs area as union
-        
-             IoU(a,b) = 1. - isect(a, b) / union(a)
-
-        Args:
-            objs (list[tuple]): The N object rectangles (x,y,w,h) in rows.
-            hyps (list[tuple]): The K hypothesis rectangles (x,y,w,h) in rows.
-            max_iou (float, optional): Maximum tolerable overlap distance. Object / hypothesis points with larger distance are set to np.nan signalling do-not-pair. Defaults to 1.0
-
-        Returns:
-            NxK array(float): Distance matrix containing pairwise distances or np.nan.
-        """
-        if np.size(objs) == 0 or np.size(hyps) == 0:
-            return np.empty((0, 0))
-    
-        objs = np.asfarray(objs)
-        hyps = np.asfarray(hyps)
-        assert objs.shape[1] == 4
-        assert hyps.shape[1] == 4
-        iou = self._boxiou(objs[:, None], hyps[None, :])
-        dist = 1 - iou
-        return np.where(dist > max_iou, np.nan, dist)
+        return np.asfarray(self.ignored_regions)
     
     def in_ignored_region(self, objs):
         """Weather objs in ignored regions
@@ -90,12 +42,23 @@ class IgnoredRegion():
         """
         if not isinstance(objs, list):
             objs = [objs]
-        if np.size(self.ignored_regions) == 0:
+        objs = np.asfarray(objs)
+        if self.regions.size == 0 or objs.size == 0:
             result = [False for _ in objs]
         else:
-            ious = self._iou_matrix(objs, self.ignored_regions, max_iou=self.threshold)
-            result = [(~np.isnan(iou)).any() for iou in ious]
+            iou = box_iou(box_xywh_to_xyxy(objs), box_xywh_to_xyxy(self.regions), 
+                           first_union=True).numpy()
+            result = iou.sum(-1) > self.threshold
         return result[0] if len(objs) == 1 else result
+    
+    def plot_regions(self, pil_img: Image.Image, fill=(0,0,0), opacity=1.):
+        imgcp = pil_img.copy()
+        if len(fill) == 3:
+            fill += (int(255 * opacity),)
+        draw = ImageDraw.Draw(imgcp, "RGBA")
+        for region in box_xywh_to_xyxy(self.regions.astype(int)):
+            draw.rectangle(tuple(region), fill=fill)
+        return imgcp
 
 
 class SingleVideoParser(SingleVideoParserBase):
@@ -137,11 +100,12 @@ class SingleVideoParser(SingleVideoParserBase):
                 l, t, w, h = float(target[0].get("left")), float(target[0].get("top")), float(target[0].get("width")), float(target[0].get("height"))
                 r, b = l + w, t + h
                 
+                # TODO: add multiple object type classifiction
                 object_type = target[1].get("vehicle_type")
                 if object_type == 'car':
                     object_type = 1
                 else:
-                    object_type = 2
+                    object_type = 1
                 overlap_ratio = float(target[1].get("truncation_ratio"))
                 in_ignored_region = self.ignored_region.in_ignored_region((l,t,w,h))
 
@@ -152,9 +116,13 @@ class SingleVideoParser(SingleVideoParserBase):
         
         self.gt = df
     
-    def get_image(self, frame_id: int) -> Image.Image:
+    def get_image(self, frame_id: int, fill_ignored_region: bool = True, 
+                  fill=(0,0,0), opacity=1.) -> Image.Image:
         """Return indicted image selected by frame_id."""
-        return Image.open(self.imDir / f'img{frame_id:05}{self.imExt}')
+        pil_img = Image.open(self.imDir / f'img{frame_id:05}{self.imExt}')
+        if fill_ignored_region:
+            return self.ignored_region.plot_regions(pil_img, fill=fill, opacity=opacity)
+        return pil_img
     
     def convert2mate(self, frame_ids) -> dict:
         df_gt = self.get_gt(frame_ids)
@@ -163,23 +131,24 @@ class SingleVideoParser(SingleVideoParserBase):
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
-            referred, bboxes, vises, confidences = [], [], [], []
+            bboxes, vises, confidences = [], [], []
             for i in frame_ids:
                 if i in track_group['frame_index'].values:
-                    referred.append(True)
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
                     vises.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
-                    confidences.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
+                    confidences.append(track_group.loc[track_group['frame_index'] == i, 'confidence'].values[0])
                 else:
-                    referred.append(False)
                     bboxes.append(np.zeros(4, dtype=float))
                     vises.append(0.)
                     confidences.append(0)
-            video_mate['referred'].append(np.array(referred))
+            video_mate['referred'].append(np.array(confidences))
             video_mate['boxes'].append(np.array(bboxes))
             video_mate['visibilities'].append(np.array(vises))
             video_mate['confidences'].append(np.array(confidences))
         video_mate = {k: np.array(video_mate[k]) for k in key}
+        video_mate['boxes'].reshape(-1, len(frame_ids), 4)
+        video_mate['referred'].reshape(-1, len(frame_ids))
+        video_mate['confidences'].reshape(-1, len(frame_ids))
         video_mate['frame_ids'] = frame_ids
         video_mate['orig_size'] = (self.imWidth, self.imHeight)
         video_mate['video_name'] = self.sequence_name
@@ -194,7 +163,7 @@ class SingleVideoParser(SingleVideoParserBase):
         # orig_size of frames origin size of [w, h]
         # padding empty object if no obj in selected_frame
         frame_ids = self._get_sampling_frame_ids(item)
-        images = self.get_images(frame_ids)
+        images = self.get_images(frame_ids, opacity=0.)
         video_mate = self.convert2mate(frame_ids)
         
         return images, video_mate

@@ -1,0 +1,30 @@
+# * Tensorboard Ablation
+# should enable Tensorboard first
+board_vis_input_enable:
+  desc: Visualization of dataloader input and ground truth 
+  value: false
+board_vis_mid_enable:
+  desc: Visualization of mid result (video sequence output)
+  value: false
+board_vis_res_enable:
+  desc: Visualization of finally result (merge all video sequences output)
+  value: false
+board_vis_res_size:
+  desc: Visualization of finally result size (Width, Height)
+  value: 
+    - 960
+    - 540
+board_vis_res_interval:
+  desc: Visualization of finally result interval (start, end, step)
+  value: 
+    - 1
+    - 100
+    - 1
+board_vis_res_save:
+  value: false
+board_vis_ablation_enable:
+  desc: Visualization of attention ablation of DETR of DeformableDETR
+  value: false
+board_vis_item:
+  desc: Visualization of dataloader item list, -1 means all
+  value: -1
