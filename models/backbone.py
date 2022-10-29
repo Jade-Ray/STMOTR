@@ -23,17 +23,17 @@ class VideoSwinTransformerBackbone(nn.Module):
             patch_embed_weight = patch_embed_weight.sum(dim=2, keepdims=True)
             state_dict['patch_embed.proj.weight'] = patch_embed_weight
             swin_backbone.load_state_dict(state_dict)
-    
-        self.layer_output_channels = swin_backbone.layer_num_features
+
         self.patch_embed = swin_backbone.patch_embed
         self.pos_drop = swin_backbone.pos_drop
-        self.layers = swin_backbone.layers
+        self.layers = swin_backbone.layers[:-1]
         self.downsamples = nn.ModuleList()
         for layer in self.layers:
             self.downsamples.append(layer.downsample)
             layer.downsample = None
         self.downsamples[-1] = None # downsampling after the last layer is not necessary
         
+        self.layer_output_channels = [swin_backbone.embed_dim * 2 ** i for i in range(len(self.layers))]
         self.train_backbone = train_backbone
         if not train_backbone:
             for parameter in self.parameters():
@@ -44,6 +44,7 @@ class VideoSwinTransformerBackbone(nn.Module):
         
         vid_embeds = self.patch_embed(vid_frames)
         vid_embeds = self.pos_drop(vid_embeds)
+        
         outputs = []
         for layer, downsample in zip(self.layers, self.downsamples):
             vid_embeds = layer(vid_embeds.contiguous())

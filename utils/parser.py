@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument(
         "--init_method",
         help="Initialization method, includes TCP or shared file-system",
-        default="tcp://localhost:9999",
+        default="tcp://127.0.0.1:12356",
         type=str,
     )
     parser.add_argument(
@@ -83,7 +83,12 @@ def load_yaml_config(cfg: dict, config_path: Path):
     if '__base__' in config:
         base_path = config.pop('__base__')
         cfg = {**config, **cfg}
-        return load_yaml_config(cfg, config_path.parent / base_path)
+        if isinstance(base_path, (list, tuple)):
+            for bp in base_path:
+                cfg = load_yaml_config(cfg, config_path.parent / bp)
+        else:
+            cfg = load_yaml_config(cfg, config_path.parent / base_path)
+        return cfg
     else:
         return {**config, **cfg}
 

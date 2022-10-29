@@ -56,6 +56,11 @@ class SingleVideoParserBase(object):
         return self._min_node_num
     
     @property
+    def align_overlap_num(self) -> int:
+        """The number of align overlap frames"""
+        return self.overlap_frame * self.sampling_rate
+    
+    @property
     def visible_thresh(self):
         """The visible threshold of object"""
         return 1 - self._max_overlap
@@ -94,14 +99,14 @@ class SingleVideoParserBase(object):
             return self.seqLength - self.selecte_frame_diff
         else:
             # for val with config frame overlap
-            return math.ceil((self.seqLength - self.overlap_frame) / 
-                             (self.selecte_frame_scale - self.overlap_frame))
+            return math.ceil((self.seqLength - self.align_overlap_num) / 
+                             (self.selecte_frame_scale - self.align_overlap_num))
     
-    def get_images(self, frame_ids: List[int]) -> List[Image.Image]:
+    def get_images(self, frame_ids: List[int], **kwargs) -> List[Image.Image]:
         """Return indicted images list selected by frame_ids."""
-        return [self.get_image(i) for i in frame_ids]
+        return [self.get_image(i, **kwargs) for i in frame_ids]
     
-    def get_image(self, frame_id: int) -> Image.Image:
+    def get_image(self, frame_id: int, **kwargs) -> Image.Image:
         """Return indicted image selected by frame_id."""
         return Image.open(self.imDir / f'{frame_id:06}{self.imExt}')
     
@@ -138,7 +143,7 @@ class SingleVideoParserBase(object):
         if self.subset_type == 'train':
             return item + self.start_frame_id
         else:
-            begin_index = item * (self.selecte_frame_scale - self.overlap_frame) + self.start_frame_id
+            begin_index = item * (self.selecte_frame_scale - self.align_overlap_num) + self.start_frame_id
             # if end_index over max frame, fit it.
             if begin_index + self.selecte_frame_diff > self.end_frame_id:
                 return self.end_frame_id - self.selecte_frame_diff

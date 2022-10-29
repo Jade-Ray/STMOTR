@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 import torchvision.transforms.functional as F
 import numpy as np
+from tqdm import tqdm
 from scipy import interpolate
 import cv2 as cv
 
@@ -20,7 +21,7 @@ logger = logging.get_logger(__name__)
 
 @torch.no_grad()
 def plot_inputs_as_video(inputs: Tensor, boxes: List[Tensor], 
-                         frameids: List[Tensor], 
+                         frameids: List[Tensor], referred: List[Tensor],
                          norm_mean=[0.485, 0.456, 0.406], norm_std=[0.229, 0.224, 0.225]) -> Tensor:
     """
     Normalize Inverse inputs tensor, and draw Boundingboxes on images, return video tensor of (B, T, C, H, W).
@@ -30,14 +31,17 @@ def plot_inputs_as_video(inputs: Tensor, boxes: List[Tensor],
     B, C, T, H, W,  = inputs.shape
     
     outputs = []
-    for batch_img, batch_boxes, batch_frameids in zip(inputs, boxes, frameids):
+    for batch_img, batch_boxes, batch_frameids, batch_referred in zip(inputs, boxes, frameids, referred):
         batch_img, batch_boxes = normalizeInverse(batch_img.transpose(0, 1), 
                                                   boxes=batch_boxes.transpose(0, 1))
-        for img, box_list, frameid in zip(batch_img, batch_boxes.numpy(), batch_frameids.numpy()):
+        for img, box_list, frameid, refer in zip(batch_img, batch_boxes.numpy(), batch_frameids.numpy(), batch_referred.transpose(0, 1).numpy()):
             mat = ImageConvert.to_mat_image(img)
             cv.putText(mat, f'{frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
-            for l, t, r, b in box_list.astype(int):
-                cv_rectangle(mat, (l,t), (r,b), (0, 255, 0), thickness=2)
+            for (l, t, r, b), ref in zip(box_list.astype(int), refer):
+                if ref:
+                    cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=-1, alpha=0.2)
+                else:
+                    cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=2, style='dashed')
             outputs.append(ImageConvert.to_tensor(mat))
     outputs = torch.stack(outputs, dim=0).view(B, T, C, H, W)
     return outputs
@@ -103,30 +107,41 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
     else:
         writer = None
     
-    for frameid in meter.frameids:
+    pbar = tqdm(meter.frameids)
+    for frameid in pbar:
+        pbar.set_description(f'ploting: {sequence_name} {frameid}f')
         if frameid not in plot_interval and writer is None:
             continue
-        mat = ImageConvert.to_mat_image(parser.get_image(frameid))
+        mat = ImageConvert.to_mat_image(parser.get_image(frameid, opacity=0.75))
         cv.putText(mat, f'{sequence_name}: {frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
         mot_events = meter.get_frame_events(frameid)
         summary = meter.get_summary(end_frameid=frameid)
         text = f"mota:{summary['mota'][0]:.2f} motp:{summary['motp'][0]:.2f} nfp:{summary['num_false_positives'][0]} nmis:{summary['num_misses'][0]} nsw:{summary['num_switches'][0]}"
-        cv.putText(mat, text, (5,parser.imHeight-5), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
+        cv.putText(mat, text, (5,parser.imHeight-5), cv.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2, cv.LINE_AA)
             
-        for Type, OId, HId, Dis in mot_events.values:
+        for Type, OId, HId, Dis in mot_events:
             o_l, o_t, o_r, o_b = meter.get_box(frameid, OId, mode='gt', format='xyxy')
             h_l, h_t, h_r, h_b = meter.get_box(frameid, HId, mode='pred', format='xyxy')
             if Type == 'MATCH':
                 cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 255, 0), 2)
             elif Type == 'FP':
-                cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 0, 255), 2, style='dashed')
+                cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 0, 255), 2)
             elif Type == 'MISS':
-                cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (0, 0, 255), 2)
+                cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (0, 0, 255), 2, style='dashed')
             elif Type == 'SWITCH':
+                last_events = meter.get_frame_events(frameid - 1)
+                last_index = np.where(last_events[:, 1]==OId)[0]
+                if last_index.size == 0:
+                    last_HId = HId
+                else:
+                    last_HId = last_events[last_index, 2][0]
+                if last_HId in last_events[:, 2] or last_HId in last_events[:, 1]:
+                    o_l, o_t, o_r, o_b = meter.get_box(frameid - 1, last_HId, mode='pred', format='xyxy')
                 cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (255, 0, 0), -1, alpha=0.2)
                 cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (255, 0, 0), -1, alpha=0.2)
                 cv.arrowedLine(mat, (o_l,o_t), (h_l,h_t), (255, 0, 0), 1)
                 cv.arrowedLine(mat, (o_r,o_b), (h_r,h_b), (255, 0, 0), 1)
+                cv.putText(mat, f'{Dis:.2f}', (o_l, o_t), cv.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255), 1, cv.LINE_AA)
 
         if frameid in plot_interval:
             output = cv.resize(mat, resize)

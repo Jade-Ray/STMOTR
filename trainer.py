@@ -60,7 +60,7 @@ class Trainer:
                 module=model,
                 device_ids=[cur_device],
                 output_device=cur_device,
-                find_unused_parameters=False,)
+                find_unused_parameters=True,)
         if self.is_master_proc:
             misc.log_model_info(model)
         self.model = model
@@ -362,6 +362,11 @@ class Trainer:
         logger.info('Model Visulization.')
         self.model.eval()
         
+        if isinstance(self.cfg.board_vis_item, (list, tuple)):
+            vis_item = self.cfg.board_vis_item
+        elif self.cfg.board_vis_item == -1:
+            vis_item = list(range(len(self.data_loader_val)))
+            
         if vis_ablation:
             if self.model._get_name() == 'DeformableMMOTR':
                 spatial_shapes, point_offsets, dec_attn_weights = [], [], []
@@ -399,13 +404,17 @@ class Trainer:
                 logger.warning(f'Not supported Ablation transformer model {self.model._get_name()}')
                 hooks = []
         
-        for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
+        pbar = tqdm(self.data_loader_val)
+        for cur_iter, (samples, targets) in enumerate(pbar):
+            pbar.set_description(
+                f'processing: {targets[0]["frame_indexes"][0]}~{targets[-1]["frame_indexes"][-1]} frames')
             # visualization input images
-            if self.writer is not None and vis_input:
+            if self.writer is not None and vis_input and cur_iter in vis_item:
                 input_video = vis_utils.plot_inputs_as_video(
                     rearrange(samples.tensors, 't b c h w -> b c t h w'), 
                     [t['boxes'] for t in targets],
-                    [t['frame_indexes'] for t in targets]
+                    [t['frame_indexes'] for t in targets],
+                    [t['referred'] for t in targets],
                 )
                 self.writer.add_video(input_video, tag='Video Input', global_step=cur_iter)
                 del input_video
@@ -432,7 +441,7 @@ class Trainer:
             self.val_meter.update(predictions_gathered)
             
             # Visualization medium images
-            if self.writer is not None and vis_mid:
+            if self.writer is not None and vis_mid and cur_iter in vis_item:
                 medium_video = vis_utils.plot_midresult_as_video(
                     self.val_meter, list(predictions_gathered.keys()))
                 self.writer.add_video(
@@ -441,7 +450,7 @@ class Trainer:
                 del medium_video
             
             # visualization ablation images
-            if self.writer is not None and vis_ablation:
+            if self.writer is not None and vis_ablation and cur_iter in vis_item:
                 if self.model._get_name() == 'DeformableMMOTR':
                     t, b = embed_points[-1].shape[:2]
                     nlevels, nheads, npoints = self.model.feature_levels, self.model.nheads, self.model.npoints
@@ -480,6 +489,7 @@ class Trainer:
             self.val_meter.iter_tic()
         del samples
         # Log epoch stats.
+        logger.info('Summarizing meter...')
         self.val_meter.synchronize_between_processes()
         self.val_meter.summarize(save_pred=False)
         
@@ -488,11 +498,15 @@ class Trainer:
                 hook.remove()
             
         # visualization final images
+        logger.info('Visualizing predict video...')
         if self.writer is not None and vis_res:
             for i, (sequence_name, meter) in enumerate(self.val_meter.meters.items()):
                 final_video = vis_utils.plot_pred_as_video(
                     sequence_name, meter, self.val_meter.base_ds, 
-                    save_video=True, output_dir=self.output_dir)
+                    save_video=self.cfg.board_vis_res_save, 
+                    output_dir=self.output_dir,
+                    plot_interval=self.cfg.board_vis_res_interval,
+                    resize=self.cfg.board_vis_res_size)
                 self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
                 del final_video
             

@@ -5,6 +5,7 @@ import torch
 
 area = lambda track: (track[..., 2] - track[..., 0]) * (track[..., 3] - track[..., 1])
 
+
 def track_distance(tracks1, tracks2, tgt_vis_mask, mode='mean'):
     """
     Euler distance of bbox of tracks, and the format is [num, T, 4]

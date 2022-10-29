@@ -60,12 +60,13 @@ class InterpolateTrack():
         """Calculate the average of two continuous frame to fill in new frame ids"""
         assert frame_ids.shape[0] == y.shape[0], "frame_ids and track data lengthes should be same."
         assert frame_ids.shape[0] < new_frame_ids.shape[0], "frame_ids lengthes should be less new_frame_ids."
+        assert frame_ids[0] == new_frame_ids[0], "first frame id should be same."
         ratio = int(new_frame_ids.shape[0] / y.shape[0])
         
         new_y = []
-        for i in range(len(frame_ids) - 1):
+        for i in range(len(frame_ids)):
             start_y = y[i].copy()
-            end_y = y[i + 1].copy()
+            end_y = start_y.copy() if i==len(frame_ids)-1 else y[i + 1].copy()
             if isinstance(start_y, np.ndarray):
                 temp = []
                 for sy, ey in zip(start_y, end_y):
@@ -73,7 +74,6 @@ class InterpolateTrack():
                 new_y.append(np.stack(temp).transpose())
             else:
                 new_y.append(np.linspace(start_y, end_y, ratio, endpoint=False))
-        new_y.append([y[-1].copy(), y[-1].copy()])
         new_y = np.concatenate(new_y, axis=0)
         return new_y
     
