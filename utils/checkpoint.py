@@ -136,7 +136,7 @@ def load_checkpoint(
 
     # Account for the DDP wrapper in the multi-gpu setting.
     ms = model.module if data_parallel else model
-    epoch = 0
+    epoch = -1
     
     # Load the checkpoint on CPU to avoid GPU mem spike.
     with open(path_to_checkpoint, "rb") as f:
