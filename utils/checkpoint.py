@@ -141,11 +141,16 @@ def load_checkpoint(
     # Load the checkpoint on CPU to avoid GPU mem spike.
     with open(path_to_checkpoint, "rb") as f:
         checkpoint = torch.load(f, map_location="cpu")
-    ms.load_state_dict(checkpoint['model_state_dict'])
+    miss_keys, unexpected_keys = ms.load_state_dict(checkpoint['model_state_dict'], strict=False)
+    if len(miss_keys) > 0:
+        logger.warning(f"Model state dict has {len(miss_keys)} miss keys. There are {miss_keys}")
+    if len(unexpected_keys) > 0:
+        logger.warning(f"Model state dict has {len(unexpected_keys)} unexpected keys. May cause to ERROR. There are {miss_keys}")
+    
     if 'epoch' in checkpoint.keys():
         epoch = checkpoint['epoch']
-    if optimizer:
+    if 'optimizer_state_dict' in checkpoint.keys() and optimizer:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    if lr_scheduler:
+    if 'scheduler_state_dict' in checkpoint.keys() and lr_scheduler:
         lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     return epoch
