@@ -68,7 +68,8 @@ class SingleVideoParser(SingleVideoParserBase):
 
 
 class Tunnel(Dataset):
-    def __init__(self, subset_type: str = 'train', dataset_path: str ='./data/Tunnel', sampling_num: int = 8, sampling_rate: int = 2, **kwargs):
+    def __init__(self, subset_type: str = 'train', dataset_path: str ='./data/Tunnel', 
+                 sampling_num: int = 8, sampling_rate: int = 2, **kwargs):
         super(Tunnel, self).__init__()
         assert subset_type in ['train', 'test'], "error, unsupported dataset subset type. use 'train' or 'test'."
         self.subset_type = subset_type
@@ -79,12 +80,15 @@ class Tunnel(Dataset):
         
     def _load_data_from_sequence_list(self, sampling_num, sampling_rate):
         sequence_file = Path(__file__).parent / f'sequence_list_{self.subset_type}.txt'
+        assert sequence_file.exists()
+        
         data_folder = self.dataset_path / self.subset_type
         sequence_file_list = np.loadtxt(sequence_file, dtype=str)
         sequence_file_list = sequence_file_list if sequence_file_list.ndim > 0 else [sequence_file_list]
         
         files_path = data_folder.glob('K258-*')
         files_selected_path = [file for file in files_path if file.stem in sequence_file_list]
+        assert len(files_selected_path) > 0
         
         # load all the mot files
         self.data = []

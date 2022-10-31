@@ -308,12 +308,13 @@ class Trainer:
     def eval_epoch(self, cur_epoch):
         # Evaluation mode enabled. The running stats would not be updated.
         self.model.eval()
-        self.val_meter.iter_tic()
-        epoch_step = (cur_epoch+1)//self.eval_period
-        if ((cur_epoch+1) == self.epochs and self.epochs % self.eval_period !=0):
-            epoch_step += 1
-        epoch_step *= (len(self.data_loader_val) // self.cfg.board_freq)
         
+        self.val_meter.iter_tic()
+        if isinstance(self.cfg.board_vis_item, (list, tuple)):
+            vis_item = self.cfg.board_vis_item
+        elif self.cfg.board_vis_item == -1:
+            vis_item = list(range(len(self.data_loader_val)))
+
         for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
             # Transfer the data to the current GPU device.
             if self.cfg.num_gpus:
@@ -331,12 +332,14 @@ class Trainer:
             torch.cuda.synchronize()
             self.val_meter.iter_toc()
             self.val_meter.update(predictions_gathered)
-            if self.writer is not None and cur_iter % self.cfg.board_freq == 0:
+            
+            # Just plot first frame val results due to memory consumption
+            if self.writer is not None and cur_iter == vis_item[0]:
                 medium_video = vis_utils.plot_midresult_as_video(
                     self.val_meter, list(predictions_gathered.keys()))
                 self.writer.add_video(
                     medium_video, tag="Video Medium Result", 
-                    global_step= epoch_step + cur_iter)
+                    global_step= cur_epoch)
                 del medium_video
             
             torch.cuda.synchronize()
