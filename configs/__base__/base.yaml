@@ -64,18 +64,27 @@ horizontal_flip_augmentations:
 train_size_list:
   desc: size set of random resize of input frames
   value:
+    - 244
+    - 256
+    - 288
+    - 320
+    - 352
+    - 384
+    - 416
+    - 448
     - 480
     - 512
+    - 544
 train_max_size:
   desc: max size of random resize of input frames
-  value: 640
+  value: 960
 eval_size_list:
   desc: size set of random resize of input frames
   value:
-    - 800
+    - 540
 eval_max_size:
   desc: max size of random resize of input frames
-  value: 1333
+  value: 940
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
   value: 'output'

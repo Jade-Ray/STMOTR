@@ -183,6 +183,8 @@ class UADETRAC(Dataset):
         
     def _load_data_from_sequence_list(self, sampling_num, sampling_rate):
         sequence_file = Path(__file__).parent / f'sequence_list_{self.subset_type}.txt'
+        assert sequence_file.exists()
+        
         if self.subset_type == 'train':
             data_folder = self.dataset_path / 'train' / 'DETRAC-Annotations-XML'
         else:
@@ -193,6 +195,7 @@ class UADETRAC(Dataset):
         
         files_path = data_folder.glob('MVI_[0-9][0-9][0-9][0-9][0-9].xml')
         files_selected_path = [file for file in files_path if file.stem in sequence_file_list]
+        assert len(files_selected_path) > 0
         
         # load all the mot files
         self.data = []

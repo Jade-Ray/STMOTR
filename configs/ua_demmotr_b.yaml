@@ -1,4 +1,4 @@
-# The tiny model setting
+# The base model setting
 __base__: 
   desc: the base config yaml
   value: 
@@ -37,12 +37,9 @@ dataset_name:
   value: ua
 dataset_path:
   value: data/UA_DETRAC
-train_max_size:
-  desc: max size (320, 568) of random resize of input frames
-  value: 568
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
-  value: output/demmotr_ua_t
+  value: output/demmotr_ua_b
 num_workers:
   desc: number of workers to load data
   value: 4
@@ -55,7 +52,7 @@ eval_batch_size:
 board_enable:
   value: true
 board_dir:
-  value: runs/demmotr_ua_t
+  value: runs/demmotr_ua_b
 board_freq:
   value: 10
 
