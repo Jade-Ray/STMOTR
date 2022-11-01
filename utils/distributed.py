@@ -145,11 +145,14 @@ def gather_dict(input_dict, group=None):
     if world_size < 2:
         return input_dict
     with torch.no_grad():
-        output = [None for _ in range(world_size)]
+        outputs = [None for _ in range(world_size)]
         dist.all_gather_object(
-            output,
+            outputs,
             input_dict,
             group=group
         )
-
-    return output
+        
+        output_dict = {}
+        for output in outputs:
+            output_dict.update(output)
+    return output_dict
