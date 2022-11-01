@@ -40,6 +40,10 @@ dataset_path:
 train_max_size:
   desc: max size (448, 796) of random resize of input frames
   value: 796
+eval_size_list:
+  desc: size set of random resize of input frames
+  value:
+    - 448
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
   value: output/demmotr_ua_s
@@ -47,9 +51,9 @@ num_workers:
   desc: number of workers to load data
   value: 4
 batch_size:
-  value: 4
+  value: 2
 eval_batch_size:
-  value: 4
+  value: 1
 
 # * Tensorboard
 board_enable:
