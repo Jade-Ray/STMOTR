@@ -348,7 +348,7 @@ def cv_rectangle(mat, pt1, pt2, color, thickness=1, style='', alpha=1.):
         style (str, optional): Style of the rectangle with 3 options.`dashed` is draw dashed line of rectangle, `dotted` is draw dotted line of rectangle, `''` is norm rectangle. Defaults to ''.
         alpha (float, optional): Alpha of the rectangle. Defaults to `1.`.
     """
-    if pt1 == pt2:
+    if pt1[0] == pt2[0] or pt1[1] == pt2[1]:
         return
     overlay = mat.copy()
     if style in ('dashed', 'dotted'):

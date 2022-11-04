@@ -110,7 +110,7 @@ def plot_motmeter_table(writer: TensorboardWriter,
                         global_step=None,):
     import motmetrics as mm
     figure = vis_utils.plot_table(
-        figsize=(20, 5),
+        figsize=(20, 10),
         cellText=np.around(motmeter_summary.values, 2),
         colLabels=[mm.io.motchallenge_metric_names[name] for name in motmeter_summary.columns],
         rowLabels=motmeter_summary.index,
@@ -183,7 +183,7 @@ def plot_pr_curve(writer: TensorboardWriter, recalls: np.ndarray, precisions: np
                   num_thresholds: int=None, tag:str='PR CURVE', kind='linear',
                   motas: np.ndarray=None):
     if num_thresholds is None:
-        num_thresholds = len(recalls)
+        num_thresholds = 11
     
     pr_f = interpolate.interp1d(np.nan_to_num(recalls), np.nan_to_num(precisions), 
                                 kind=kind, fill_value='extrapolate')

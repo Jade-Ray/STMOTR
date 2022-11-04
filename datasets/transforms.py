@@ -9,7 +9,7 @@ import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
 from utils.box_ops import box_xyxy_to_cxcywh, box_cxcywh_to_xyxy
-from utils.track_ops import area
+from utils.track_ops import area, wh_ratio
 
 
 def crop(images, targets, region):
@@ -18,7 +18,7 @@ def crop(images, targets, region):
     targets = targets.copy()
     i, j, h, w = region
     
-    fields = ["labels", "visibilities"]
+    fields = ["labels"]
 
     if "boxes" in targets:
         boxes = targets["boxes"]
@@ -30,13 +30,25 @@ def crop(images, targets, region):
         targets["boxes"] = cropped_boxes
         fields.append("boxes")
 
-    # fix vis elements for which the boxes have changed area 
-    # and remove track elements for which the boxes all have zero area
-    if "boxes" in targets and "visibilities" in targets:
+    # fix target elements for which the boxes have changed area
+    if "boxes" in targets:
         cropped_boxes_area = area(targets["boxes"])
-        targets["visibilities"] *= (cropped_boxes_area / boxes_area).nan_to_num()
-        keep = ~torch.all(targets["visibilities"] < 0.2, dim=1)
-
+        cropped_boxes_wh_ratio = wh_ratio(targets["boxes"])
+        # less than 1 piex area or w/h ratio not in [0.2, 5]
+        mask = (cropped_boxes_area < 1) | (cropped_boxes_wh_ratio < 0.2) | (cropped_boxes_wh_ratio > 5)
+        
+        # reset zero area boxes referred is 0
+        if "referred" in targets:
+            targets["referred"][mask] = 0
+            fields.append("referred")
+        
+        # scale visibilities with its box area scale ratio
+        if "visibilities" in targets:
+            targets["visibilities"] *= (cropped_boxes_area / boxes_area).nan_to_num()
+            fields.append("visibilities")
+        
+        # remove track elements for which the boxes all have zero area
+        keep = ~torch.all(mask, dim=1)
         for field in fields:
             targets[field] = targets[field][keep]
 
@@ -106,16 +118,18 @@ def resize(images, targets, size, max_size=None):
 
 def frozen_time(images, targets):
     frozen_images = [images[0] for _ in images]
+    frame_num = len(frozen_images)
     
     targets = targets.copy()
     if "boxes" in targets:
-        boxes = targets["boxes"]
-        frame_num = boxes.shape[1]
-        frozen_boxes = boxes[:, 0][:, None].repeat(1, frame_num, 1)
-        vis = targets["visibilities"]
-        frozen_vis = vis[:, 0][:, None].repeat(1, frame_num)
+        frozen_boxes = targets["boxes"][:, 0][:, None].repeat(1, frame_num, 1)
         targets["boxes"] = frozen_boxes
+    if "visibilities" in targets:
+        frozen_vis = targets["visibilities"][:, 0][:, None].repeat(1, frame_num)
         targets["visibilities"] = frozen_vis
+    if "referred" in targets:
+        frozen_referred = targets["referred"][:, 0][:, None].repeat(1, frame_num)
+        targets["referred"] = frozen_referred
     
     return frozen_images, targets
 
@@ -153,7 +167,7 @@ class CenterCrop(object):
         return crop(imgs, targets, (crop_top, crop_left, crop_height, crop_width))
 
 
-class RandomHorizontalFlip(object):
+class MotRandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
@@ -163,7 +177,7 @@ class RandomHorizontalFlip(object):
         return imgs, targets
 
 
-class RandomResize(object):
+class MotRandomResize(object):
     def __init__(self, sizes, max_size=None):
         assert isinstance(sizes, (list, tuple))
         self.sizes = sizes
@@ -172,6 +186,23 @@ class RandomResize(object):
     def __call__(self, imgs, targets=None):
         size = random.choice(self.sizes)
         return resize(imgs, targets, size, self.max_size)
+
+
+class MotConfidenceFilter(object):
+    """Filter all zero confidence track"""
+    def __call__(self, imgs, targets):
+        targets = targets.copy()
+        fields = ["labels", "boxes", "referred"]
+        if "boxes" in targets and "referred" in targets:
+            keep = ~torch.all(targets["referred"] < 1, dim=1)
+            
+            if "visibilities" in targets:
+                fields.append("visibilities")
+            
+            for field in fields:
+                targets[field] = targets[field][keep]
+        
+        return imgs, targets
 
 
 class RandomSelect(object):
@@ -190,9 +221,9 @@ class RandomSelect(object):
         return self.transforms2(imgs, targets)
 
 
-class RandomFrozenTime(object):
+class MotRandomFrozenTime(object):
     """Likely crop operation, but work on time dim to get frozen time images and targets with probability p."""
-    def __init__(self, p=0.2):
+    def __init__(self, p=0.5):
         self.p = p
         
     def __call__(self, imgs, targets):
@@ -202,10 +233,44 @@ class RandomFrozenTime(object):
 
 
 class ToTensor(object):
+    def __call__(self, img, target):
+        return F.to_tensor(img), target
+
+
+class MotToTensor(ToTensor):
     """Return Tensor images with `num frames` x `channel` x `height` x `width`"""
     def __call__(self, imgs, targets):
         return torch.stack([F.to_tensor(img) for img in imgs]), targets
-    
+
+
+class MotColorJitter(T.ColorJitter):
+    def __call__(self, imgs, targets):
+        fn_idx, brightness_factor, contrast_factor, saturation_factor, hue_factor = self.get_params(
+            self.brightness, self.contrast, self.saturation, self.hue
+        )
+        
+        for fn_id in fn_idx:
+            if fn_id == 0 and brightness_factor is not None:
+                imgs = [F.adjust_brightness(img, brightness_factor) for img in imgs]
+            elif fn_id == 1 and contrast_factor is not None:
+                imgs = [F.adjust_contrast(img, contrast_factor) for img in imgs]
+            elif fn_id == 2 and saturation_factor is not None:
+                imgs = [F.adjust_saturation(img, saturation_factor) for img in imgs]
+            elif fn_id == 3 and hue_factor is not None:
+                imgs = [F.adjust_hue(img, hue_factor) for img in imgs]
+             
+        return imgs, targets
+
+
+class RandomApply(T.RandomApply):
+    """Apply randomly a list of transformations with a given probability."""
+    def __call__(self, images, targets):
+        if self.p < torch.rand(1):
+            return images, targets
+        for t in self.transforms:
+            images, targets = t(images, targets)
+        return images, targets
+
 
 class Normalize(object):
     def __init__(self, mean, std):

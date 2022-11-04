@@ -57,34 +57,10 @@ sampling_num:
   value: 8
 sampling_rate:
   value: 2
-resize_and_crop_augmentations:
-  value: true
-horizontal_flip_augmentations:
-  value: true
-train_size_list:
-  desc: size set of random resize of input frames
-  value:
-    - 244
-    - 256
-    - 288
-    - 320
-    - 352
-    - 384
-    - 416
-    - 448
-    - 480
-    - 512
-    - 544
-train_max_size:
-  desc: max size of random resize of input frames
-  value: 960
-eval_size_list:
-  desc: size set of random resize of input frames
-  value:
-    - 540
-eval_max_size:
-  desc: max size of random resize of input frames
-  value: 940
+color_jitter_aug:
+  value: false
+rand_crop_aug:
+  value: false
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
   value: 'output'
@@ -92,9 +68,9 @@ num_workers:
   desc: number of workers to load data
   value: 4
 batch_size:
-  value: 2
+  value: 1
 eval_batch_size:
-  value: 2
+  value: 1
 
 # * Tensorboard
 board_enable:

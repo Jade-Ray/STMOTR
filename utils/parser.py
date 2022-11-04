@@ -31,7 +31,7 @@ def parse_args():
     )
     parser.add_argument(
         "--running_mode", 
-        choices=['train', 'eval', 'ablation'], 
+        choices=['train', 'prtest', 'eval', 'ablation'], 
         required=True,
         help="mode to run, either 'train' or 'eval' or 'ablation'"
     )

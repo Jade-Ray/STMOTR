@@ -13,6 +13,18 @@ from datasets.video_parse import SingleVideoParserBase
 import datasets.transforms as T
 from utils.misc import nested_tensor_from_videos_list
 from utils.box_ops import box_xywh_to_xyxy, box_iou
+import utils.logging as logging
+
+logger = logging.get_logger(__name__)
+
+UA_CLASSES = {1: 'car', 2: 'van', 3: 'bus', 4: 'others'}
+
+
+def get_object_type_num(type_name: str):
+    for k, v in UA_CLASSES.items():
+        if type_name == v:
+            return k
+    return 4 # default return others
 
 
 class IgnoredRegion():
@@ -22,7 +34,7 @@ class IgnoredRegion():
         ignored_regions (list[tuple]): The Ignored Region format is the list and a rectangle (x, y, w, h) in item.
         threshold (float): The threshold `(0.~1.)` of iou to detect weather obj in ignored_regions, 0 is overlap, 1 is non-overlap.
     """
-    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.25):
+    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.1):
         self.ignored_regions = ignored_regions
         self.threshold = threshold
     
@@ -99,13 +111,8 @@ class SingleVideoParser(SingleVideoParserBase):
                 track_id = int(target.get("id"))
                 l, t, w, h = float(target[0].get("left")), float(target[0].get("top")), float(target[0].get("width")), float(target[0].get("height"))
                 r, b = l + w, t + h
-                
-                # TODO: add multiple object type classifiction
-                object_type = target[1].get("vehicle_type")
-                if object_type == 'car':
-                    object_type = 1
-                else:
-                    object_type = 1
+
+                object_type = get_object_type_num(target[1].get("vehicle_type"))
                 overlap_ratio = float(target[1].get("truncation_ratio"))
                 in_ignored_region = self.ignored_region.in_ignored_region((l,t,w,h))
 
@@ -127,7 +134,7 @@ class SingleVideoParser(SingleVideoParserBase):
     def convert2mate(self, frame_ids) -> dict:
         df_gt = self.get_gt(frame_ids)
         video_mate = defaultdict(list)
-        key = ['track_ids', 'labels', 'referred', 'boxes', 'visibilities', 'confidences']
+        key = ['track_ids', 'labels', 'boxes', 'confidences']
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
@@ -135,19 +142,15 @@ class SingleVideoParser(SingleVideoParserBase):
             for i in frame_ids:
                 if i in track_group['frame_index'].values:
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
-                    vises.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
                     confidences.append(track_group.loc[track_group['frame_index'] == i, 'confidence'].values[0])
                 else:
                     bboxes.append(np.zeros(4, dtype=float))
                     vises.append(0.)
                     confidences.append(0)
-            video_mate['referred'].append(np.array(confidences))
             video_mate['boxes'].append(np.array(bboxes))
-            video_mate['visibilities'].append(np.array(vises))
             video_mate['confidences'].append(np.array(confidences))
         video_mate = {k: np.array(video_mate[k]) for k in key}
         video_mate['boxes'].reshape(-1, len(frame_ids), 4)
-        video_mate['referred'].reshape(-1, len(frame_ids))
         video_mate['confidences'].reshape(-1, len(frame_ids))
         video_mate['frame_ids'] = frame_ids
         video_mate['orig_size'] = (self.imWidth, self.imHeight)
@@ -239,28 +242,62 @@ class UADETRAC(Dataset):
     
 
 class UADETRACTransforms:
-    def __init__(self, subset_type, horizontal_flip_augmentations, resize_and_crop_augmentations,
-                 train_size_list, train_max_size, eval_size_list, eval_max_size, **kwargs):
-        normalize = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        scales = train_size_list  # size is slightly smaller than eval size below to fit in GPU memory
-        transforms = []
-        if horizontal_flip_augmentations and subset_type == 'train':
-            transforms.append(T.RandomHorizontalFlip())
-        if resize_and_crop_augmentations:
-            if subset_type == 'train':
-                transforms.append(T.RandomResize(scales, max_size=train_max_size))
-            elif subset_type == 'valid' or subset_type == 'test':
-                transforms.append(T.RandomResize(eval_size_list, max_size=eval_max_size))
+    def __init__(self, subset_type, color_jitter_aug=False, rand_crop_aug=False, **kwargs):
+        
+        normalize = T.Compose([
+            T.MotToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+        
+        scales = [224, 240, 256, 272, 288, 304, 320, 336, 352, 368]
+        
+        if subset_type == 'train':
+            if color_jitter_aug:
+                logger.info('Training with RandomColorJitter.')
+                color_transforms = [
+                    T.RandomApply([T.MotColorJitter(brightness=0.5, contrast=0.25, saturation=0.25, hue=0),]),
+                ]
+            if rand_crop_aug:
+                logger.info('Training with RandomCrop.')
+                scale_transforms = [
+                    T.MotRandomFrozenTime(),
+                    T.MotRandomHorizontalFlip(),
+                    T.RandomSelect(
+                        T.MotRandomResize(scales, max_size=655),
+                        T.Compose([
+                            T.MotRandomResize([140, 170, 200]),
+                            T.RandomSizeCrop(112, 200),
+                            T.MotRandomResize(scales, max_size=655),
+                        ])
+                    ),
+                    T.MotConfidenceFilter(),
+                    normalize,
+                ]
             else:
-                raise ValueError(f'No {subset_type} transform strategy.')
-        transforms.extend([T.ToTensor(), normalize])
-        self.transforms = T.Compose(transforms)
+                scale_transforms = [
+                    T.MotRandomFrozenTime(),
+                    T.MotRandomHorizontalFlip(),
+                    T.MotRandomResize(scales, max_size=655),
+                    T.MotConfidenceFilter(),
+                    normalize,
+                ]
+            
+            self.transforms = T.Compose(color_transforms + scale_transforms)
+        
+        elif subset_type == 'val' or subset_type == 'test':
+            self.transforms = T.Compose([
+                T.MotRandomResize([368], max_size=655),
+                normalize,
+            ])
+        else:
+            raise ValueError(f'Unknow {subset_type} transform strategy.')
     
     def __call__(self, imgs, video_mate):
         num_frame = len(imgs)
         targets = {
             'boxes': torch.tensor(video_mate['boxes']).view(-1, num_frame, 4),
-            'referred': torch.tensor(video_mate['referred']).view(-1, num_frame),
+            'referred': torch.tensor(video_mate['confidences']).view(-1, num_frame),
+            'labels': torch.tensor(video_mate['labels']),
             'orig_size': torch.tensor(video_mate['orig_size']),
             'frame_indexes': torch.tensor(video_mate['frame_ids'])
         }
