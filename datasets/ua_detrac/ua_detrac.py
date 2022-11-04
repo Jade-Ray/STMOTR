@@ -266,7 +266,7 @@ class UADETRACTransforms:
                         T.MotRandomResize(scales, max_size=655),
                         T.Compose([
                             T.MotRandomResize([140, 170, 200]),
-                            T.RandomSizeCrop(112, 200),
+                            T.FixedMotRandomCrop(112, 200),
                             T.MotRandomResize(scales, max_size=655),
                         ])
                     ),

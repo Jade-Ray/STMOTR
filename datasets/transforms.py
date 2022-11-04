@@ -155,6 +155,27 @@ class RandomSizeCrop(object):
         return crop(imgs, targets, region)
 
 
+class FixedMotRandomCrop(object):
+    def __init__(self, min_size: int, max_size: int):
+        self.min_size = min_size
+        self.max_size = max_size
+    
+    def __call__(self, imgs, targets: dict):
+        w, h = imgs[0].width, imgs[0].height
+        min_original_size = float(min((w, h)))
+        max_original_size = float(max((w, h)))
+        
+        min_size = random.randint(self.min_size, min(min_original_size, self.max_size))
+        max_size = int(round(min_size * max_original_size / min_original_size))
+        
+        if w > h:
+            ow, oh = max_size, min_size
+        else:
+            ow, oh = min_size, max_size
+        region = T.RandomCrop.get_params(imgs[0], [oh, ow])
+        return crop(imgs, targets, region)
+
+
 class CenterCrop(object):
     def __init__(self, size):
         self.size = size
