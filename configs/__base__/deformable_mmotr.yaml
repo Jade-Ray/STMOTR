@@ -12,10 +12,10 @@ enable_amp:
 # * Deformable Transformer
 num_encoder_layers:
   desc: Number of encoding layers in the transformer
-  value: 6
+  value: 3
 num_decoder_layers:
   desc: Number of decoding layers in the transformer
-  value: 6
+  value: 3
 dim_feedforward:
   desc: Intermediate size of the feedforward layers in the transformer blocks
   value: 1024
@@ -39,7 +39,7 @@ npoints:
   value: 4
 num_queries:
   desc: Number of query slots
-  value: 50
+  value: 100
 
 # * Loss
 aux_loss:

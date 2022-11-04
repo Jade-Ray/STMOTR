@@ -1,5 +1,5 @@
 from datasets.tunnel import TunnelDataset
-from datasets.ua_detrac import UADETRAC
+from datasets.ua_detrac import UADETRAC, UA_CLASSES
 
 
 def get_parser_data_from_dataset(dataset):

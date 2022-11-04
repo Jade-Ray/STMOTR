@@ -4,6 +4,7 @@ Utilities for track of bounding box manipulation and GIoU.
 import torch
 
 area = lambda track: (track[..., 2] - track[..., 0]) * (track[..., 3] - track[..., 1])
+wh_ratio = lambda track: (track[..., 2] - track[..., 0]) / (track[..., 3] - track[..., 1])
 
 
 def track_distance(tracks1, tracks2, tgt_vis_mask, mode='mean'):

@@ -31,9 +31,19 @@ def run(process_id, cfg, running_mode):
             vis_mid=cfg.board_vis_mid_enable, 
             vis_res=cfg.board_vis_res_enable, 
             vis_ablation=cfg.board_vis_ablation_enable)
+    elif running_mode == 'prtest':
+        logger.info(f"PR MOTA Test")
+        trainer.pr_test()
+        trainer.clear_memory()
+        if cfg.distributed:
+            dist.barrier()
+
+        if trainer.writer is not None:
+            trainer.writer.close()
+        logger.info(f"Eval Done")
     else:  # eval mode:
         logger.info(f"Only Eval")
-        trainer.eval_epoch(trainer.epochs)
+        trainer.eval_epoch(trainer.epoch-1)
         trainer.clear_memory()
         if cfg.distributed:
             dist.barrier()

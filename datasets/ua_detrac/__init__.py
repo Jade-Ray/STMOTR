@@ -1,3 +1,3 @@
-from .ua_detrac import UADETRAC
+from .ua_detrac import UADETRAC, UA_CLASSES
 
-__all__ = ['UADETRAC']
+__all__ = ['UADETRAC', 'UA_CLASSES']

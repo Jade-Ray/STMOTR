@@ -80,7 +80,16 @@ class Trainer:
         self.max_norm = cfg.clip_max_norm
         
         # Load a checkpoint to resume training if applicable.
-        if cfg.auto_resume and cu.has_checkpoint(cfg.output_dir):
+        if cfg.resume != "":
+            logger.info("Load from given checkpoint file.")
+            checkpoint_epoch = cu.load_checkpoint(
+                cfg.resume,
+                self.model,
+                cfg.distributed,
+                self.optimizer,
+                self.lr_scheduler,)
+            self.epoch = checkpoint_epoch + 1
+        elif cfg.auto_resume and cu.has_checkpoint(cfg.output_dir):
             logger.info("Load from last checkpoint.")
             last_checkpoint = cu.get_last_checkpoint(cfg.output_dir)
             if last_checkpoint is not None:
@@ -93,15 +102,6 @@ class Trainer:
                 self.epoch = checkpoint_epoch + 1
             else:
                 self.epoch = 0
-        elif cfg.resume != "":
-            logger.info("Load from given checkpoint file.")
-            checkpoint_epoch = cu.load_checkpoint(
-                cfg.resume,
-                self.model,
-                cfg.distributed,
-                self.optimizer,
-                self.lr_scheduler,)
-            self.epoch = checkpoint_epoch + 1
         else:
             self.epoch = 0
         
@@ -188,7 +188,7 @@ class Trainer:
         return str(self.val_meter)
 
     @torch.no_grad()
-    def test(self):
+    def pr_test(self):
         logger.info("Running Test DataLoader...")
         self.model.eval()
         total_results = {}
@@ -210,24 +210,24 @@ class Trainer:
         
         logger.info("Getten total results, Then calculate PR_CURVE...")
         # Calculate PR test in every log_threshold
-        log_thresholds = np.linspace(0, 1, 10)
+        log_thresholds = np.linspace(0.1, 0.9, 9)
         recall_record, precision_record, mota_record = defaultdict(list), defaultdict(list), defaultdict(list)
         
         for log_threshold in log_thresholds:
-            self.mot_meter.update(total_results, log_threshold=log_threshold)
-            self.mot_meter.summarize()
-            logger.info(f"In {log_threshold} Threshold:\n {str(self.mot_meter)}")
+            self.val_meter.update(total_results, log_threshold=log_threshold)
+            self.val_meter.summarize()
+            logger.info(f"In {log_threshold:.2f} Threshold:\n {str(self.val_meter)}")
             
-            for sequence_name in self.mot_meter.summary.index:
-                recall_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'recall'])
-                precision_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'precision'])
-                mota_record[sequence_name].append(self.mot_meter.summary.loc[sequence_name, 'mota'])
+            for sequence_name in self.val_meter.summary.index:
+                recall_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'recall'])
+                precision_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'precision'])
+                mota_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'mota'])
             
-            self.mot_meter.reset()
+            self.val_meter.reset()
 
         scores = {}
         if self.writer is not None:
-            for sequence_name in self.mot_meter.summary.index:
+            for sequence_name in self.val_meter.summary.index:
                 score = tb.plot_pr_curve(self.writer, 
                                         np.array(recall_record[sequence_name]), 
                                         np.array(precision_record[sequence_name]), 
@@ -339,7 +339,7 @@ class Trainer:
                     self.val_meter, list(predictions_gathered.keys()))
                 self.writer.add_video(
                     medium_video, tag="Video Medium Result", 
-                    global_step= cur_epoch)
+                    global_step= cur_epoch+1)
                 del medium_video
             
             torch.cuda.synchronize()
@@ -351,11 +351,11 @@ class Trainer:
         self.val_meter.log_epoch_stats(cur_epoch)
         if self.writer is not None:
             tb.plot_motmeter_table(
-                self.writer, self.val_meter.summary, global_step=cur_epoch)
+                self.writer, self.val_meter.summary, global_step=cur_epoch+1)
             self.writer.add_scalars({
                 'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'mota'],
                               'MOTP': self.val_meter.summary.loc['OVERALL', 'motp']},
-            }, global_step=cur_epoch)
+            }, global_step=cur_epoch+1)
             
         self.val_meter.reset()
 

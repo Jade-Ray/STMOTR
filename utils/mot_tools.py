@@ -60,7 +60,7 @@ class MOTeval(object):
             
         # selection of above threshold score boxes
         # get mask of query above threshold and less than two elements are True in T dim.
-        mask = (scores > self.logit_threshold).sum(-1) > 2
+        mask = (scores > self.logit_threshold).sum(-1) > 1
         query_ids = np.where(mask)
         boxes = boxes[mask]
         scores = scores[mask]
