@@ -136,6 +136,8 @@ def build(args):
         postprocessor = BasePostProcess(referred_sigmoid=True)
     elif args.dataset_name == 'ua':
         postprocessor = BasePostProcess(referred_sigmoid=True)
+    elif args.dataset_name == 'mot20':
+        postprocessor = BasePostProcess(referred_sigmoid=True)
     else:
         assert False, f'postprocessing for dataset: {args.dataset_name} is not supported'
     return model, criterion, postprocessor

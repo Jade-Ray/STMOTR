@@ -138,7 +138,7 @@ class SingleVideoParser(SingleVideoParserBase):
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
-            bboxes, confidences = [], [], []
+            bboxes, confidences = [], []
             for i in frame_ids:
                 if i in track_group['frame_index'].values:
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
