@@ -334,7 +334,8 @@ class NormalizeInverse(T.Normalize):
             return images, self._convert_boxes(boxes, h, w)
         if targets is not None:
             targets = targets.copy()
-            targets["boxes"] = self._convert_boxes(targets["boxes"], h, w)
+            if "boxes" in targets:
+                targets["boxes"] = self._convert_boxes(targets["boxes"], h, w)
             return images, targets
         return images, None
 

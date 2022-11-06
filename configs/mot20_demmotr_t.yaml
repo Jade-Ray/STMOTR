@@ -1,0 +1,67 @@
+# The tiny model setting
+__base__: 
+  desc: the base config yaml
+  value: 
+    - __base__/deformable_mmotr.yaml
+    - __base__/ablation.yaml
+
+# * Train & Eval
+epochs:
+  value: 50
+
+# * Deformable Transformer
+num_queries:
+  desc: Number of query slots
+  value: 200
+
+# * Dataset Parameters
+dataset_name:
+  value: mot20
+dataset_path:
+  value: data/MOT20
+color_jitter_aug:
+  value: false
+rand_crop_aug:
+  value: false
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/demmotr_mot20_t
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 2
+eval_batch_size:
+  value: 2
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: runs/demmotr_mot20_t
+board_freq:
+  value: 10
+
+# * Tensorboard Ablation
+# should enable Tensorboard first
+board_vis_input_enable:
+  desc: Visualization of dataloader input and ground truth 
+  value: true
+board_vis_mid_enable:
+  desc: Visualization of mid result (video sequence output)
+  value: true
+board_vis_res_enable:
+  desc: Visualization of finally result (merge all video sequences output)
+  value: true
+board_vis_res_save:
+  value: true
+board_vis_ablation_enable:
+  desc: Visualization of attention ablation of DETR of DeformableDETR
+  value: false
+board_vis_item:
+  desc: Visualization of dataloader item list, -1 means all
+  value:
+    - 0
+    - 1
+    - 46
+    - 47

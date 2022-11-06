@@ -13,7 +13,7 @@ class SingleVideoParserBase(object):
     
     Args:
         mot_file_path (Path): The file path recording `multi-obj-track` info file path.
-        subset_type (str): Options includes `train` or `test` mode. For the train set, select samples one by one until the max frame number of data. For the test set, select order samples with the overlap frame between successive samples. Default `train`.
+        subset_type (str): Options includes `train` or `val` or `test` mode. For the train set, select samples one by one until the max frame number of data. For the val or test set, select order samples with the overlap frame between successive samples. Default `train`.
         mun_frames (int): The number of clip frames to parser. Default `8`.
         sampling_rate (int): The video sampling rate of the input clip. Default `2`.
         random_sampling (bool): Whether to randomly sample the clip. Default `False`.

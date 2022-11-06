@@ -1,5 +1,6 @@
 from datasets.tunnel import TunnelDataset
 from datasets.ua_detrac import UADETRAC, UA_CLASSES
+from datasets.mot20 import MOT20, MOT20_CLASSES
 
 
 def get_parser_data_from_dataset(dataset):
@@ -18,4 +19,8 @@ def build_dataset(image_set, dataset_name, **kwargs):
         return TunnelDataset(image_set, **kwargs)
     elif dataset_name == 'ua':
         return UADETRAC(image_set, **kwargs)
+    elif dataset_name == 'mot20':
+        if image_set == 'test':
+            image_set = 'val'
+        return MOT20(image_set, **kwargs)
     raise ValueError(f'dataset {dataset_name} not supported')
