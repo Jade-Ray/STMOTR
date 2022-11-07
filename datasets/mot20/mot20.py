@@ -58,7 +58,7 @@ class SingleVideoParser(SingleVideoParserBase):
             for track_id, track_group in df_gt.groupby('track_id'):
                 video_mate['track_ids'].append(track_id)
                 video_mate['labels'].append(int(track_group['object_type'].mode()))
-                bboxes, confidences = [], [], []
+                bboxes, confidences = [], []
                 for i in frame_ids:
                     if i in track_group['frame_index'].values:
                         bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
@@ -166,35 +166,34 @@ class MOT20Transforms:
             T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
         
-        scales = [480]
+        scales = [480, 512, 544, 576, 608, 640]
         
         if subset_type == 'train':
+            color_transforms = []
             if color_jitter_aug:
                 logger.info('Training with RandomColorJitter.')
-                color_transforms = [
+                color_transforms.append(
                     T.RandomApply([T.MotColorJitter(brightness=0.5, contrast=0.25, saturation=0.25, hue=0),]),
-                ]
+                )
             if rand_crop_aug:
                 logger.info('Training with RandomCrop.')
                 scale_transforms = [
-                    T.MotRandomFrozenTime(),
                     T.MotRandomHorizontalFlip(),
                     T.RandomSelect(
-                        T.MotRandomResize(scales, max_size=655),
+                        T.MotRandomResize(scales, max_size=1333),
                         T.Compose([
-                            T.MotRandomResize([140, 170, 200]),
-                            T.FixedMotRandomCrop(112, 200),
-                            T.MotRandomResize(scales, max_size=655),
-                        ])
+                            T.MotRandomResize([333, 416, 500]),
+                            T.FixedMotRandomCrop(320, 500),
+                            T.MotRandomResize(scales, max_size=1333),
+                        ]),
                     ),
                     T.MotConfidenceFilter(),
                     normalize,
                 ]
             else:
                 scale_transforms = [
-                    T.MotRandomFrozenTime(),
                     T.MotRandomHorizontalFlip(),
-                    T.MotRandomResize(scales, max_size=854),
+                    T.MotRandomResize(scales, max_size=800),
                     T.MotConfidenceFilter(),
                     normalize,
                 ]
@@ -203,7 +202,7 @@ class MOT20Transforms:
         
         elif subset_type == 'val' or subset_type == 'test':
             self.transforms = T.Compose([
-                T.MotRandomResize([368], max_size=655),
+                T.MotRandomResize([640], max_size=800),
                 normalize,
             ])
         else:
@@ -218,7 +217,8 @@ class MOT20Transforms:
         if 'boxes' in video_mate:
             targets.update({
                 'boxes': torch.tensor(video_mate['boxes']).view(-1, num_frame, 4),
-                'referred': torch.tensor(video_mate['referred']).view(-1, num_frame),
+                'referred': torch.tensor(video_mate['confidences']).view(-1, num_frame),
+                'labels': torch.tensor(video_mate['labels']),
             })
         return self.transforms(imgs, targets)
 

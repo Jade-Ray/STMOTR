@@ -1,3 +1,3 @@
-from .mot20 import MOT20
+from .mot20 import MOT20, MOT20_CLASSES
 
-__all__ = ['MOT20']
+__all__ = ['MOT20', 'MOT20_CLASSES']
