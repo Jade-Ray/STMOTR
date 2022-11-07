@@ -166,7 +166,7 @@ class MOT20Transforms:
             T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
         
-        scales = [320, 336, 352, 368, 384, 400, 416, 432]
+        scales = [480, 512, 544, 576, 608, 640]
         
         if subset_type == 'train':
             color_transforms = []
@@ -180,12 +180,12 @@ class MOT20Transforms:
                 scale_transforms = [
                     T.MotRandomHorizontalFlip(),
                     T.RandomSelect(
-                        T.MotRandomResize(scales, max_size=768),
+                        T.MotRandomResize(scales, max_size=1333),
                         T.Compose([
-                            T.MotRandomResize([200, 250, 300]),
-                            T.FixedMotRandomCrop(168, 300),
-                            T.MotRandomResize(scales, max_size=768),
-                        ])
+                            T.MotRandomResize([333, 416, 500]),
+                            T.FixedMotRandomCrop(320, 500),
+                            T.MotRandomResize(scales, max_size=1333),
+                        ]),
                     ),
                     T.MotConfidenceFilter(),
                     normalize,
@@ -193,7 +193,7 @@ class MOT20Transforms:
             else:
                 scale_transforms = [
                     T.MotRandomHorizontalFlip(),
-                    T.MotRandomResize(scales, max_size=768),
+                    T.MotRandomResize(scales, max_size=800),
                     T.MotConfidenceFilter(),
                     normalize,
                 ]
@@ -202,7 +202,7 @@ class MOT20Transforms:
         
         elif subset_type == 'val' or subset_type == 'test':
             self.transforms = T.Compose([
-                T.MotRandomResize([432], max_size=768),
+                T.MotRandomResize([640], max_size=800),
                 normalize,
             ])
         else:

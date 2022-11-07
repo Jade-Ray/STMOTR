@@ -109,7 +109,7 @@ def load_config(args, path_to_config=None):
         for key, value in zip(args.opts[0::2], args.opts[1::2]):
             if key in cfg:
                 if isinstance(cfg[key], bool):
-                    cfg[key] = bool(value)
+                    cfg[key] = yaml.safe_load(value)
                 elif isinstance(cfg[key], int):
                     cfg[key] = int(value)
                 elif isinstance(cfg[key], float):
