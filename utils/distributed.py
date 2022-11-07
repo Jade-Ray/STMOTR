@@ -37,7 +37,7 @@ def init_process_group(
     dist.init_process_group(
         backend=dist_backend,
         init_method=init_method,
-        timeout=datetime.timedelta(seconds=20),
+        timeout=datetime.timedelta(seconds=100),
         world_size=world_size,
         rank=proc_rank,
     )
