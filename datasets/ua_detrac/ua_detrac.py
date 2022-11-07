@@ -248,7 +248,7 @@ class UADETRACTransforms:
             T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
         
-        scales = [224, 240, 256, 272, 288, 304, 320, 336, 352, 368]
+        scales = [224, 240, 256, 272, 288, 304, 320, 336, 352]
         
         if subset_type == 'train':
             if color_jitter_aug:
@@ -262,11 +262,11 @@ class UADETRACTransforms:
                     T.MotRandomFrozenTime(),
                     T.MotRandomHorizontalFlip(),
                     T.RandomSelect(
-                        T.MotRandomResize(scales, max_size=655),
+                        T.MotRandomResize(scales, max_size=626),
                         T.Compose([
                             T.MotRandomResize([140, 170, 200]),
                             T.FixedMotRandomCrop(112, 200),
-                            T.MotRandomResize(scales, max_size=655),
+                            T.MotRandomResize(scales, max_size=626),
                         ])
                     ),
                     T.MotConfidenceFilter(),
@@ -276,7 +276,7 @@ class UADETRACTransforms:
                 scale_transforms = [
                     T.MotRandomFrozenTime(),
                     T.MotRandomHorizontalFlip(),
-                    T.MotRandomResize(scales, max_size=655),
+                    T.MotRandomResize(scales, max_size=626),
                     T.MotConfidenceFilter(),
                     normalize,
                 ]
@@ -285,7 +285,7 @@ class UADETRACTransforms:
         
         elif subset_type == 'val' or subset_type == 'test':
             self.transforms = T.Compose([
-                T.MotRandomResize([368], max_size=655),
+                T.MotRandomResize([352], max_size=626),
                 normalize,
             ])
         else:
