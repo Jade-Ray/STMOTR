@@ -120,8 +120,8 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
         cv.putText(mat, text, (5,parser.imHeight-5), cv.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2, cv.LINE_AA)
             
         for Type, OId, HId, Dis in mot_events:
-            o_l, o_t, o_r, o_b = meter.get_box(frameid, OId, mode='gt', format='xyxy')
-            h_l, h_t, h_r, h_b = meter.get_box(frameid, HId, mode='pred', format='xyxy')
+            o_l, o_t, o_r, o_b = meter.get_gt_box(frameid, OId, format='xyxy')
+            h_l, h_t, h_r, h_b = meter.get_pred_box(frameid, HId, format='xyxy')
             if Type == 'MATCH':
                 cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 255, 0), 2)
             elif Type == 'FP':
@@ -136,7 +136,7 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
                 else:
                     last_HId = last_events[last_index, 2][0]
                 if last_HId in last_events[:, 2] or last_HId in last_events[:, 1]:
-                    o_l, o_t, o_r, o_b = meter.get_box(frameid - 1, last_HId, mode='pred', format='xyxy')
+                    o_l, o_t, o_r, o_b = meter.get_pred_box(frameid - 1, last_HId, format='xyxy')
                 cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (255, 0, 0), -1, alpha=0.2)
                 cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (255, 0, 0), -1, alpha=0.2)
                 cv.arrowedLine(mat, (o_l,o_t), (h_l,h_t), (255, 0, 0), 1)
@@ -263,38 +263,38 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
     return fig
 
 
-def plot_pr_curve(recalls:np.ndarray, precisions: np.ndarray, area:float=None,
-                  ori_recalls=None, ori_precisions=None):
+def plot_pr_curve(precisions: np.ndarray, recalls:np.ndarray, area:float,):
     fig, ax =plt.subplots()
-    ax.plot(recalls, precisions, '-')
-    ax.fill_between(recalls, precisions, alpha=0.4, 
-                    label=f'area: {area:.2f}' if area is not None else 'area')
-    if ori_recalls is not None and ori_precisions is not None:
-        ax.plot(ori_recalls, ori_precisions, 'o')
     
-    ax.legend(loc='upper right')
+    ax.plot(recalls, precisions, '.--')
+    ax.fill_between(recalls, precisions, alpha=0.4)
+    
     ax.set_xlabel('recall')
     ax.set_xlim((0, 1))
     ax.set_ylabel('precision')
     ax.set_ylim((0, 1))
+    ax.set_title(f'AP {area:.2f}')
     ax.grid()
     return fig
 
 
-def plot_pr_mota_curve(recalls:np.ndarray, precisions: np.ndarray, motas: np.ndarray,
-                       area:float=None,):
+def plot_pr_mot_curve(precisions: np.ndarray, recalls:np.ndarray, mots: np.ndarray,
+                      title:str = 'PR MOT'):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
+        
+    ax.plot3D(recalls, precisions, mots, '.--')
     
-    ax.plot(recalls, precisions, motas, label='PR_MOTA curve')
-    ax.legend()
     ax.set_xlabel('recall')
     ax.set_xlim((0, 1))
+    ax.invert_xaxis()
     ax.set_ylabel('precision')
     ax.set_ylim((0, 1))
-    ax.set_zlabel('mota')
-    ax.set_zlim((-1, 1))
-    
+    ax.invert_yaxis()
+    ax.set_zlabel('motp')
+    ax.set_zlim((0, 1))
+    ax.set_title(title)
+    ax.view_init(30, 30)
     return fig
 
 

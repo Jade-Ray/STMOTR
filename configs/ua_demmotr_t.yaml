@@ -8,6 +8,9 @@ __base__:
 # * Train & Eval
 epochs:
   value: 50
+mot_type:
+  desc: the type of moteval, which are 'track', 'mot' and 'prmot'
+  value: prmot
 
 # * Dataset Parameters
 dataset_name:
