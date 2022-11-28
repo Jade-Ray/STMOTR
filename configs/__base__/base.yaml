@@ -35,6 +35,9 @@ save_period:
 referred_threshold:
   desc: the threshold of whether obj is reffered from all query
   value: 0.5
+mot_type:
+  desc: the type of moteval, which are 'track', 'mot' and 'prmot'
+  value: mot
 
 # * Backbone
 backbone_name:
@@ -53,6 +56,9 @@ dataset_name:
   value: tunnel
 dataset_path:
   value: data/Tunnel
+start_frameid:
+  desc: the start frameid of the dataset
+  value: 1
 sampling_num:
   value: 8
 sampling_rate:

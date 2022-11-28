@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from scipy import interpolate, integrate
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from einops import rearrange
 
 import utils.logging as logging
 import visualization.utils as vis_utils
+from utils.mot_tools import PRMotEval
         
 log.getLogger('torch.utils.tensorboard.summary').setLevel(log.ERROR)
 log.getLogger('PIL').setLevel(log.WARNING)
@@ -72,14 +72,18 @@ class TensorboardWriter(object):
         """
         self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps) 
     
-    def add_text(self, tag, text_string, global_step=None, walltime=None):
+    def add_text(self, tag, text_string, global_step=None, walltime=None, format_trans=False):
         """Add text data to summary.
         Args:
             tag (string): Data identifier
             text_string (string): String to save
             global_step (int, optional): Global step value to record. Defaults to None.
             walltime (float, optional): Optional override default walltime (time.time()) seconds after epoch of event. Defaults to None.
+            format_trans (bool, optional): Transform string format to markdown reader.
         """
+        if format_trans:
+            # Tensorboard understands markdown so you can actually replace \n with <br/> and   with &nbsp;
+            text_string = text_string.replace( '\n', '<br/>').replace(' ', '&nbsp;&nbsp;')
         self.writer.add_text(tag, text_string, global_step=global_step, walltime=walltime)
     
     def add_hparams(self, hparam_dict, metric_dict, hparam_domain_discrete=None, run_name=None):
@@ -179,26 +183,15 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
         logger.warning('The dec attn dict has non-understand key.')
 
 
-def plot_pr_curve(writer: TensorboardWriter, recalls: np.ndarray, precisions: np.ndarray, 
-                  num_thresholds: int=None, tag:str='PR CURVE', kind='linear',
-                  motas: np.ndarray=None):
-    if num_thresholds is None:
-        num_thresholds = 11
+def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
+    figure = vis_utils.plot_pr_curve(meter.precisions, meter.recalls, meter.ap)
+    writer.add_figure(figure, f'{sequence_name} PR CURVE〽️')
     
-    pr_f = interpolate.interp1d(np.nan_to_num(recalls), np.nan_to_num(precisions), 
-                                kind=kind, fill_value='extrapolate')
-    new_x = np.linspace(0, 1, num_thresholds)
-    new_y = np.nan_to_num(pr_f(new_x))
+    figure = vis_utils.plot_pr_mot_curve(meter.precisions, meter.recalls, meter.motas,
+                                         f'PR-MOTA {meter.pr_mota:.2f}')
+    writer.add_figure(figure, f'{sequence_name} PR MOTA CURVE〽️')
     
-    if motas is None:
-        area = integrate.quad(pr_f, 0, 1)[0]
-        figure = vis_utils.plot_pr_curve(new_x, new_y, area)
-        writer.add_figure(figure, tag)
-    else:
-        pr_mota_f = interpolate.interp2d(np.nan_to_num(recalls), np.nan_to_num(precisions),
-                                         np.nan_to_num(motas, -1.0), kind=kind)
-        area = integrate.dblquad(pr_mota_f, 0, 1, 0, 1)[0]
-        new_z = np.nan_to_num(np.diagonal(pr_mota_f(new_x, new_y)), -1.0)
-        figure = vis_utils.plot_pr_mota_curve(new_x, new_y, new_z, area)
-        writer.add_figure(figure, tag+'(MOTA version)')
+    figure = vis_utils.plot_pr_mot_curve(meter.precisions, meter.recalls, meter.motps,
+                                         f'PR-MOTP {meter.pr_motp:.2f}')
+    writer.add_figure(figure, f'{sequence_name} PR MOTP CURVE〽️')
         

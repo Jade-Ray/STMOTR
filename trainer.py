@@ -134,7 +134,8 @@ class Trainer:
             self.log_period, cfg.output_dir)
         self.val_meter = MotValMeter(
             get_parser_data_from_dataset(dataset_val), 
-            self.epochs, cfg.output_dir, cfg.referred_threshold)
+            self.epochs, cfg.output_dir, cfg.referred_threshold, 
+            cfg.start_frameid, cfg.mot_type)
         
         # set up writer for logging to Tensorboard format.
         if cfg.board_enable and self.is_master_proc:
@@ -186,56 +187,6 @@ class Trainer:
         logger.info(f"Training done:\n {str(self.val_meter)}")
         
         return str(self.val_meter)
-
-    @torch.no_grad()
-    def pr_test(self):
-        logger.info("Running Test DataLoader...")
-        self.model.eval()
-        total_results = {}
-        for samples, targets in tqdm(self.data_loader_val):
-        
-            # Transfer the data to the current GPU device.
-            if self.cfg.num_gpus:
-                samples = samples.cuda(non_blocking=True)
-                targets = [{k: v.cuda(non_blocking=True) for k, v in t.items()} for t in targets]
-            
-            outputs = self.model(samples)
-            orig_sample_sizes = torch.stack([t["orig_size"] for t in targets], dim=0).cuda(non_blocking=True)
-            predictions = self.postprocessor(outputs, orig_sample_sizes)
-            predictions = {target['item'].item(): prediction for target, prediction in zip(targets, predictions)}
-            total_results.update(du.gather_dict(predictions))
-            
-            torch.cuda.synchronize()
-        del samples
-        
-        logger.info("Getten total results, Then calculate PR_CURVE...")
-        # Calculate PR test in every log_threshold
-        log_thresholds = np.linspace(0.1, 0.9, 9)
-        recall_record, precision_record, mota_record = defaultdict(list), defaultdict(list), defaultdict(list)
-        
-        for log_threshold in log_thresholds:
-            self.val_meter.update(total_results, log_threshold=log_threshold)
-            self.val_meter.summarize()
-            logger.info(f"In {log_threshold:.2f} Threshold:\n {str(self.val_meter)}")
-            
-            for sequence_name in self.val_meter.summary.index:
-                recall_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'recall'])
-                precision_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'precision'])
-                mota_record[sequence_name].append(self.val_meter.summary.loc[sequence_name, 'mota'])
-            
-            self.val_meter.reset()
-
-        scores = {}
-        if self.writer is not None:
-            for sequence_name in self.val_meter.summary.index:
-                score = tb.plot_pr_curve(self.writer, 
-                                        np.array(recall_record[sequence_name]), 
-                                        np.array(precision_record[sequence_name]), 
-                                        motas=np.array(mota_record[sequence_name]),
-                                        tag=f'{sequence_name} PR CURVE')
-                scores[sequence_name] = score
-        
-        return scores
 
     def train_epoch(self, cur_epoch: int):
         # Enable train mode.
@@ -350,11 +301,11 @@ class Trainer:
         self.val_meter.summarize(save_pred=False)
         self.val_meter.log_epoch_stats(cur_epoch)
         if self.writer is not None:
-            tb.plot_motmeter_table(
-                self.writer, self.val_meter.summary, global_step=cur_epoch+1)
+            self.writer.add_text(
+                'MOT Meter Summary💡', self.val_meter.summary_markdown, global_step=cur_epoch+1)
             self.writer.add_scalars({
-                'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'mota'],
-                              'MOTP': self.val_meter.summary.loc['OVERALL', 'motp']},
+                'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'MOTA'],
+                              'MOTP': self.val_meter.summary.loc['OVERALL', 'MOTP']},
             }, global_step=cur_epoch+1)
             
         self.val_meter.reset()
@@ -501,8 +452,8 @@ class Trainer:
                 hook.remove()
             
         # visualization final images
-        logger.info('Visualizing predict video...')
         if self.writer is not None and vis_res:
+            logger.info('Visualizing predict video...')
             for i, (sequence_name, meter) in enumerate(self.val_meter.meters.items()):
                 final_video = vis_utils.plot_pred_as_video(
                     sequence_name, meter, self.val_meter.base_ds, 
@@ -514,7 +465,14 @@ class Trainer:
                 del final_video
             
         if self.writer is not None:
-            tb.plot_motmeter_table(self.writer, self.val_meter.summary)
+            if not self.val_meter.is_pure_track():
+                logger.info('Visualizing MOT SUMMARY TABLE')
+                self.writer.add_text('MOT Meter Summary💡', self.val_meter.summary_markdown)
+
+                if self.val_meter.mot_type == 'prmot':
+                    logger.info('Visualizing PR-MOT CURVE')
+                    for sequence_name, meter in self.val_meter.meters.items():
+                        tb.plot_prmot(self.writer, meter, sequence_name)
         
         time.sleep(1)
         logger.info('Visulization Done.')

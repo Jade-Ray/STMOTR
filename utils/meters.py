@@ -5,6 +5,7 @@ from functools import partial
 from collections import defaultdict, deque
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.distributed as dist
 import motmetrics as mm
@@ -13,7 +14,7 @@ from utils.timer import Timer
 import utils.logging as logging
 import utils.misc as misc
 import utils.distributed as du
-from utils.mot_tools import MOTeval
+from utils.mot_tools import MotTracker, MotEval, PRMotEval
 
 logger = logging.get_logger(__name__)
 
@@ -273,19 +274,18 @@ class EpochTimer:
 class MotValMeter(object):
     """
     Measures validation stats.
+    
+    Args:
+            base_ds (dataset): the base dataset of dataloader.
+            epochs (int): the max number of iteration of the current epoch.
+            mot_type (str): the type of moteval, `'track'`, `'mot'`, `'prmot'`
     """
 
-    def __init__(self, base_ds, epochs, output_dir=None, referred_threshold=0.5, start_frameid=1):
-        """
-        Args:
-            max_iter (int): the max number of iteration of the current epoch.
-            cfg (CfgNode): configs.
-        """
+    def __init__(self, base_ds, epochs, output_dir=None, referred_threshold=0.5, start_frameid=1, mot_type='mot'):
         self.base_ds = base_ds
         self.epochs = epochs
-        self.meters = defaultdict(partial(MOTeval, auto_id=False, 
-                                          logit_threshold=referred_threshold,
-                                          start_frameid=start_frameid))
+        self.mot_type = mot_type
+        self.init_meters(referred_threshold, start_frameid)
         
         self.iter_timer = Timer()
         self.data_timer = Timer()
@@ -318,6 +318,23 @@ class MotValMeter(object):
         self.data_timer.pause()
         self.net_timer.reset()
     
+    def init_meters(self, logit_threshold, start_frameid):
+        if self.mot_type == 'track':
+            self.meters = defaultdict(partial(MotTracker, logit_threshold=logit_threshold))
+        elif self.mot_type == 'mot':
+            self.meters = defaultdict(partial(MotEval, auto_id=False, 
+                                              logit_threshold=logit_threshold,
+                                              start_frameid=start_frameid))
+        elif self.mot_type == 'prmot':
+            self.meters = defaultdict(partial(PRMotEval, auto_id=False, 
+                                              logit_threshold=logit_threshold,
+                                              start_frameid=start_frameid))
+        else:
+            raise ValueError(f'{self.mot_type} is not supported!')
+    
+    def is_pure_track(self):
+        return self.mot_type == 'track'
+    
     def update(self, predictions: dict, log_threshold: float = None):
         items = list(np.unique(list(predictions.keys())))
         
@@ -334,7 +351,7 @@ class MotValMeter(object):
     def get_sequence_info(self, item):
         sequence_parser, sequence_item = self.base_ds(item)
         sequence_name = sequence_parser.sequence_name
-        if sequence_name not in self.meters.keys():
+        if sequence_name not in self.meters.keys() or not self.is_pure_track():
             self.meters[sequence_name].gt = sequence_parser.gt
         frame_ids = sequence_parser.get_frame_ids(sequence_item)
         sampling_frame_ids = sequence_parser._get_sampling_frame_ids(sequence_item)
@@ -356,24 +373,53 @@ class MotValMeter(object):
     
     def summarize(self, save_pred=False):
         for sequence_name, meter in self.meters.items():
+            logger.info(f'Summarizing {sequence_name} Video.')
             meter.match_pred_data()
             meter.summarize()
             if save_pred:
                 meter.pred_dataframe.to_csv(f'{self.output_dir}/{sequence_name}_pred.txt', header=None, index=None, sep=',', mode='w')
         
+        if self.is_pure_track():
+            self.summary = pd.DataFrame()
+            self.summary_str = 'Pure Track, NO MOT'
+            self.summary_markdown = 'Pure Track, NO MOT'
+        else:
+            self.render_summary()
+            
+    def render_summary(self):
         mh = mm.metrics.create()
-        self.summary = mh.compute_many(
+        summary = mh.compute_many(
             [meter.acc.events for meter in self.meters.values()],
             metrics=mm.metrics.motchallenge_metrics,
             names=[name for name in self.meters.keys()],
             generate_overall=True
         )
+        
+        namemap = mm.io.motchallenge_metric_names
+        formatters = mh.formatters
+        
+        summary = summary.rename(columns=namemap)
+        formatters = {namemap.get(c, c): f for c, f in formatters.items()}
+        markdownfmt = ('.1%', '.1%', '.1%', '.1%', '.1%', '.1%',
+                      '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.1%', '.3')
+        
+        if self.mot_type == 'prmot':
+            prmota = np.array([meter.pr_mota for meter in self.meters.values()])
+            prmotp = np.array([meter.pr_motp for meter in self.meters.values()])
+            thresholds = np.array([meter.logit_threshold for meter in self.meters.values()])   
+            summary.insert(15, 'PRMOTA', np.hstack((prmota, prmota.mean())))
+            summary.insert(16, 'PRMOTP', np.hstack((prmotp, prmotp.mean())))
+            summary.insert(17, 'TH', np.hstack((thresholds, thresholds.mean())))
+            formatters['PRMOTA'] = formatters['MOTA']
+            formatters['PRMOTP'] = formatters['MOTP']
+            formatters['TH'] = formatters['MOTP']
+            markdownfmt += ('.1%', '.3', '.3')
 
-        self.strsummary = mm.io.render_summary(
-            self.summary,
-            formatters=mh.formatters,
-            namemap=mm.io.motchallenge_metric_names
-        )
+        self.summary = summary
+        self.summary_str = summary.to_string(formatters=formatters)
+        
+        markdown_headline = "\n### MOT METRIC RESULT 📄\n\n"
+        self.summary_markdown = markdown_headline + summary.to_markdown(floatfmt=markdownfmt)
                 
     def log_epoch_stats(self, cur_epoch):
         """
@@ -387,12 +433,13 @@ class MotValMeter(object):
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
-        for sequence_name in self.summary.index:
-            stats.update({f'{sequence_name}_mota': self.summary.loc[sequence_name, 'mota']})
-            stats.update({f'{sequence_name}_motp': self.summary.loc[sequence_name, 'motp']})
-            
+        if not self.is_pure_track():
+            for sequence_name in self.summary.index:
+                stats.update({f'{sequence_name}_mota': self.summary.loc[sequence_name, 'MOTA']})
+                stats.update({f'{sequence_name}_motp': self.summary.loc[sequence_name, 'MOTP']})
+                
         logging.log_json_stats(stats, self.output_dir)
 
     def __str__(self):
-        return self.strsummary
+        return self.summary_str
 
