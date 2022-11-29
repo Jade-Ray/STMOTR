@@ -266,15 +266,16 @@ class PRMotEval(MotEval):
     
     @property
     def motps(self):
-        return np.hstack((0, self.get_type_summary('motp'), 0))
+        motps = 1 - self.get_type_summary('motp')
+        return np.hstack((motps[0], motps, motps[-1]))
     
     @property
     def pr_mota(self):
-        return self.compute_prmot(self.motas)
+        return self.compute_prmot(self.motas) * 100
     
     @property
     def pr_motp(self):
-        return self.compute_prmot(self.motps)
+        return self.compute_prmot(self.motps) * 100
     
     @property
     def ap(self) -> float:
@@ -321,6 +322,14 @@ class PRMotEval(MotEval):
             area += (lmot + mot) * math.sqrt((pre - lpre)**2 + (rec - lrec)**2) / 2
             lpre, lrec, lmot = pre, rec, mot
         return area
+    
+    def get_record_frame(self)-> pd.DataFrame:
+        sl = slice(1, -1, None)
+        return pd.DataFrame({
+            'Precisions' : self.precisions[sl],
+            'Recalls' : self.recalls[sl],
+            'MOTAs' : self.motas[sl] * 100,
+            'MOTPs' : self.motps[sl] * 100,}, index=self.thresholds)
     
     def _get_motchallage_summary(self, summary):
         summary = mm.io.render_summary(

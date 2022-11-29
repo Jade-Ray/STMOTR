@@ -287,14 +287,12 @@ def plot_pr_mot_curve(precisions: np.ndarray, recalls:np.ndarray, mots: np.ndarr
     
     ax.set_xlabel('recall')
     ax.set_xlim((0, 1))
-    ax.invert_xaxis()
     ax.set_ylabel('precision')
     ax.set_ylim((0, 1))
-    ax.invert_yaxis()
     ax.set_zlabel('motp')
     ax.set_zlim((0, 1))
     ax.set_title(title)
-    ax.view_init(30, 30)
+    ax.view_init(18, 235)
     return fig
 
 

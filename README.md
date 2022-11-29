@@ -8,7 +8,7 @@ conda activate mmotr
 
 conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
 
-conda install -c conda-forge opencv matplotlib scipy pandas psutil tqdm simplejson einops pyyaml motmetrics
+conda install -c conda-forge opencv matplotlib scipy pandas psutil tqdm simplejson einops pyyaml motmetrics tabulate
 
 pip install tensorboard moviepy
 ```
