@@ -81,7 +81,14 @@ class Trainer:
         self.max_norm = cfg.clip_max_norm
         
         # Load a checkpoint to resume training if applicable.
-        if cfg.resume != "":
+        if cfg.pretrained_path != "":
+            logger.info("Load from pretrained params.")
+            checkpoint_epoch = cu.load_checkpoint(
+                cfg.pretrained_path,
+                self.model,
+                cfg.distributed,)
+            self.epoch = checkpoint_epoch + 1
+        elif cfg.resume != "":
             logger.info("Load from given checkpoint file.")
             checkpoint_epoch = cu.load_checkpoint(
                 cfg.resume,
