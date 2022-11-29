@@ -267,7 +267,7 @@ class PRMotEval(MotEval):
     @property
     def motps(self):
         motps = 1 - self.get_type_summary('motp')
-        return np.hstack((motps[0], motps, motps[-1]))
+        return np.hstack((0, motps, 0))
     
     @property
     def pr_mota(self):
