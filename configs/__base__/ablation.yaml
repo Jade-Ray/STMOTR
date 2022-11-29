@@ -20,6 +20,9 @@ board_vis_res_interval:
     - 1
     - 100
     - 1
+board_vis_res_events:
+  desc: Visualization of finally result with mot events
+  value: true
 board_vis_res_save:
   value: false
 board_vis_ablation_enable:

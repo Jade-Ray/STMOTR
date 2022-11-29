@@ -108,7 +108,11 @@ class Trainer:
         
         # Create the video train and val loaders.
         dataset_train = build_dataset(image_set='train', **vars(cfg))
-        dataset_val = build_dataset(image_set='test', **vars(cfg))
+        if cfg.dataset_name == 'mot20' and cfg.mot_type != 'track':
+            dataset_val = build_dataset(image_set='val', **vars(cfg))
+        else:
+            dataset_val = build_dataset(image_set='test', **vars(cfg))
+                
         if cfg.distributed:
             sampler_train = DistributedSampler(dataset_train, shuffle=True)
             sampler_val = DistributedSampler(dataset_val, shuffle=False)
@@ -299,9 +303,9 @@ class Trainer:
         del samples
         # Log epoch stats.
         self.val_meter.synchronize_between_processes()
-        self.val_meter.summarize(save_pred=False)
+        self.val_meter.summarize(save_pred=self.cfg.mot_save)
         self.val_meter.log_epoch_stats(cur_epoch)
-        if self.writer is not None:
+        if self.writer is not None and self.cfg.mot_type != 'track':
             self.writer.add_text(
                 'MOT Meter Summary💡', self.val_meter.summary_markdown, global_step=cur_epoch+1)
             self.writer.add_scalars({
@@ -364,7 +368,7 @@ class Trainer:
             pbar.set_description(
                 f'processing: {targets[0]["frame_indexes"][0]}~{targets[-1]["frame_indexes"][-1]} frames')
             # visualization input images
-            if self.writer is not None and vis_input and cur_iter in vis_item:
+            if self.writer is not None and vis_input and cur_iter in vis_item and self.cfg.mot_type != 'track':
                 input_video = vis_utils.plot_inputs_as_video(
                     rearrange(samples.tensors, 't b c h w -> b c t h w'), 
                     [t['boxes'] for t in targets],
@@ -446,7 +450,7 @@ class Trainer:
         # Log epoch stats.
         logger.info('Summarizing meter...')
         self.val_meter.synchronize_between_processes()
-        self.val_meter.summarize(save_pred=False)
+        self.val_meter.summarize(save_pred=self.cfg.mot_save)
         
         if vis_ablation:
             for hook in hooks:
@@ -460,12 +464,13 @@ class Trainer:
                     sequence_name, meter, self.val_meter.base_ds, 
                     save_video=self.cfg.board_vis_res_save, 
                     output_dir=self.output_dir,
+                    vis_events= False if self.val_meter.is_pure_track() else self.cfg.board_vis_res_events,
                     plot_interval=self.cfg.board_vis_res_interval,
                     resize=self.cfg.board_vis_res_size)
                 self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
                 del final_video
             
-        if self.writer is not None:
+        if self.writer is not None and self.cfg.mot_type != 'track':
             if not self.val_meter.is_pure_track():
                 logger.info('Visualizing MOT SUMMARY TABLE')
                 self.writer.add_text('MOT Meter Summary💡', self.val_meter.summary_markdown)

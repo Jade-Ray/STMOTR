@@ -20,6 +20,10 @@ class MotTracker(object):
         self.iou_threshold = iou_threshold
         self.reset()
     
+    @property
+    def frameids(self):
+        return np.unique(self.pred_dataframe['frame_index'].to_numpy())
+    
     def reset(self):
         self.pred_data = defaultdict(dict)
         self.pred_dataframe = self._create_mot_dataframe()

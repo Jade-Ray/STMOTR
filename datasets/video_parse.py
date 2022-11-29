@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 from pathlib import Path
 import math
 from configparser import ConfigParser
@@ -73,7 +73,10 @@ class SingleVideoParserBase(object):
     @property
     def end_frame_id(self) -> int:
         r"""Return max frame index of parsed video data"""
-        return self.gt['frame_index'].max()
+        if self.gt is not None:
+            return self.gt['frame_index'].max()
+        else:
+            return self.seqLength
     
     def _read_seq_info(self, mot_file_path: Path):
         """Reading the mot sequence information from seqinfo.ini"""
@@ -110,8 +113,10 @@ class SingleVideoParserBase(object):
         """Return indicted image selected by frame_id."""
         return Image.open(self.imDir / f'{frame_id:06}{self.imExt}')
     
-    def get_gt(self, frame_ids: List[int]) -> pd.DataFrame:
+    def get_gt(self, frame_ids: Union[List[int], int]) -> pd.DataFrame:
         """Return indicted gt DataFrame selected by frame_ids."""
+        if isinstance(frame_ids, int):
+            frame_ids = [frame_ids]
         df = self.gt[self.gt['frame_index'].isin(frame_ids)]
         
         # filited the number of track in selected frame less than threshold

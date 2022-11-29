@@ -19,6 +19,9 @@ lr_drop_milestones:
 lr_drop_gamma:
   desc: multiplicative factor of learning rate decay, default 0.1
   value: 0.4
+mot_type:
+  desc: the type of moteval, which are 'track', 'mot' and 'prmot'
+  value: mot
 
 # * Deformable Transformer
 num_queries:
@@ -65,6 +68,9 @@ board_vis_res_enable:
   desc: Visualization of finally result (merge all video sequences output)
   value: true
 board_vis_res_save:
+  value: true
+board_vis_res_events:
+  desc: Visualization of finally result with mot events
   value: true
 board_vis_ablation_enable:
   desc: Visualization of attention ablation of DETR of DeformableDETR

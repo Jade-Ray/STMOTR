@@ -20,7 +20,5 @@ def build_dataset(image_set, dataset_name, **kwargs):
     elif dataset_name == 'ua':
         return UADETRAC(image_set, **kwargs)
     elif dataset_name == 'mot20':
-        if image_set == 'test':
-            image_set = 'val'
         return MOT20(image_set, **kwargs)
     raise ValueError(f'dataset {dataset_name} not supported')

@@ -66,16 +66,17 @@ def plot_midresult_as_video(mot_meter: MotValMeter, batch_items: list) -> Tensor
             mat = ImageConvert.to_mat_image(img)
             cv.putText(mat, f'{frameids[i]}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
             
-            gt_boxes = mate['boxes'][:,i].astype(int)
-            if 'confidences' in mate.keys():
-                gt_confidences = mate['confidences'][:, i].astype(bool)
-            else:
-                gt_confidences = np.ones(gt_boxes.shape[0]).astype(bool)
-            for confidence, (l, t, r, b) in zip(gt_confidences, gt_boxes):
-                if confidence:
-                    cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=-1, alpha=0.2)
+            if 'boxes' in mate:
+                gt_boxes = mate['boxes'][:,i].astype(int)
+                if 'confidences' in mate.keys():
+                    gt_confidences = mate['confidences'][:, i].astype(bool)
                 else:
-                    cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=2, style='dashed')
+                    gt_confidences = np.ones(gt_boxes.shape[0]).astype(bool)
+                for confidence, (l, t, r, b) in zip(gt_confidences, gt_boxes):
+                    if confidence:
+                        cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=-1, alpha=0.2)
+                    else:
+                        cv_rectangle(mat, (l,t), (r,b), (0,255,0), thickness=2, style='dashed')
             
             for boxes, scores in zip(midresults['boxes'], midresults['scores']):
                 l, t, r, b = boxes[i].astype(int)
@@ -93,7 +94,7 @@ def plot_midresult_as_video(mot_meter: MotValMeter, batch_items: list) -> Tensor
 
 @torch.no_grad()
 def plot_pred_as_video(sequence_name, meter, base_ds,
-                       save_video=False, output_dir='', 
+                       save_video=False, output_dir='', vis_events=True,
                        plot_interval=(1, 100), resize=(960, 540)) -> Tensor:
     """
     Plot MotValMeter final predication, return video tensor of (B, T, C, H, W).
@@ -101,6 +102,7 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
     outputs = []
     parser = base_ds(sequence_name=sequence_name)
     plot_interval = range(*plot_interval)
+    rcg = RCG()
     
     if save_video:
         writer = cv.VideoWriter(f'{output_dir}/{sequence_name}.avi', 
@@ -115,35 +117,12 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
         if frameid not in plot_interval and writer is None:
             continue
         mat = ImageConvert.to_mat_image(parser.get_image(frameid, opacity=0.75))
-        cv.putText(mat, f'{sequence_name}: {frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
-        mot_events = meter.get_frame_events(frameid)
-        summary = meter.get_summary(end_frameid=frameid)
-        text = f"mota:{summary['mota'][0]:.2f} motp:{summary['motp'][0]:.2f} nfp:{summary['num_false_positives'][0]} nmis:{summary['num_misses'][0]} nsw:{summary['num_switches'][0]}"
-        cv.putText(mat, text, (5,parser.imHeight-5), cv.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2, cv.LINE_AA)
-            
-        for Type, OId, HId, Dis in mot_events:
-            o_l, o_t, o_r, o_b = meter.get_gt_box(frameid, OId, format='xyxy')
-            h_l, h_t, h_r, h_b = meter.get_pred_box(frameid, HId, format='xyxy')
-            if Type == 'MATCH':
-                cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 255, 0), 2)
-            elif Type == 'FP':
-                cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 0, 255), 2)
-            elif Type == 'MISS':
-                cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (0, 0, 255), 2, style='dashed')
-            elif Type == 'SWITCH':
-                last_events = meter.get_frame_events(frameid - 1)
-                last_index = np.where(last_events[:, 1]==OId)[0]
-                if last_index.size == 0:
-                    last_HId = HId
-                else:
-                    last_HId = last_events[last_index, 2][0]
-                if last_HId in last_events[:, 2] or last_HId in last_events[:, 1]:
-                    o_l, o_t, o_r, o_b = meter.get_pred_box(frameid - 1, last_HId, format='xyxy')
-                cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (255, 0, 0), -1, alpha=0.2)
-                cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (255, 0, 0), -1, alpha=0.2)
-                cv.arrowedLine(mat, (o_l,o_t), (h_l,h_t), (255, 0, 0), 1)
-                cv.arrowedLine(mat, (o_r,o_b), (h_r,h_b), (255, 0, 0), 1)
-                cv.putText(mat, f'{Dis:.2f}', (o_l, o_t), cv.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255), 1, cv.LINE_AA)
+        cv.putText(mat, f'{frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
+        
+        if vis_events:
+            plot_mot_events(mat, meter, frameid, text_pos=(5,parser.imHeight-5))
+        else:
+            plot_track(mat, meter.get_pred_dataframe, frameid, rcg=rcg, show_id=True)
 
         if frameid in plot_interval:
             output = cv.resize(mat, resize)
@@ -159,6 +138,53 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
     return outputs[None]
 
 
+def plot_mot_events(mat, meter, frameid, text_pos=(5, 10)):
+    mot_events = meter.get_frame_events(frameid)
+    summary = meter.get_summary(end_frameid=frameid)
+    text = f"mota:{summary['mota'][0]:.2f} motp:{summary['motp'][0]:.2f} nfp:{summary['num_false_positives'][0]} nmis:{summary['num_misses'][0]} nsw:{summary['num_switches'][0]}"
+    cv.putText(mat, text, text_pos, cv.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2, cv.LINE_AA)
+            
+    for Type, OId, HId, Dis in mot_events:
+        o_l, o_t, o_r, o_b = meter.get_gt_box(frameid, OId, format='xyxy')
+        h_l, h_t, h_r, h_b = meter.get_pred_box(frameid, HId, format='xyxy')
+        if Type == 'MATCH':
+            cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 255, 0), 2)
+        elif Type == 'FP':
+            cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (0, 0, 255), 2)
+        elif Type == 'MISS':
+            cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (0, 0, 255), 2, style='dashed')
+        elif Type == 'SWITCH':
+            last_events = meter.get_frame_events(frameid - 1)
+            last_index = np.where(last_events[:, 1]==OId)[0]
+            if last_index.size == 0:
+                last_HId = HId
+            else:
+                last_HId = last_events[last_index, 2][0]
+            if last_HId in last_events[:, 2] or last_HId in last_events[:, 1]:
+                o_l, o_t, o_r, o_b = meter.get_pred_box(frameid - 1, last_HId, format='xyxy')
+            cv_rectangle(mat, (o_l,o_t), (o_r,o_b), (255, 0, 0), -1, alpha=0.2)
+            cv_rectangle(mat, (h_l,h_t), (h_r,h_b), (255, 0, 0), -1, alpha=0.2)
+            cv.arrowedLine(mat, (o_l,o_t), (h_l,h_t), (255, 0, 0), 1)
+            cv.arrowedLine(mat, (o_r,o_b), (h_r,h_b), (255, 0, 0), 1)
+            cv.putText(mat, f'{Dis:.2f}', (o_l, o_t), cv.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255), 1, cv.LINE_AA)
+
+
+def plot_track(mat, dataframe_func, frameid, rcg=None, show_id=False, show_ignore=False):
+    for id, group in dataframe_func(frameid).groupby('track_id'):
+        if rcg is not None:
+            c = tuple(map(int, rcg(id)))
+        else:
+            c = (0, 255, 0)
+        l, t, r, b = group[['l', 't', 'r', 'b']].values[0].astype(int)
+        confidence = group['confidence'].values[0] > 0
+        if confidence:
+            cv_rectangle(mat, (l,t), (r,b), c, 2)
+            if show_id:
+                cv.putText(mat, f'{id}', (l,t), cv.FONT_HERSHEY_SIMPLEX, .5, (0,0,0), 1, cv.LINE_AA)
+        elif show_ignore:
+            cv_rectangle(mat, (l,t), (r,b), c, 2, style='dashed')
+
+
 def plot_video_parser(parser: SingleVideoParserBase, output_dir=''):
     video_path = f'{output_dir}/{parser.sequence_name}_gt.avi'
     writer = cv.VideoWriter(video_path, cv.VideoWriter_fourcc(*'MJPG'), 10, 
@@ -168,15 +194,8 @@ def plot_video_parser(parser: SingleVideoParserBase, output_dir=''):
     for frameid in pbar:
         pbar.set_description(f'ploting: {parser.sequence_name} {frameid}f')
         mat = ImageConvert.to_mat_image(parser.get_image(frameid, opacity=0.75))
-        cv.putText(mat, f'{parser.sequence_name}: {frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
-        for id, group in parser.get_gt([frameid]).groupby('track_id'):
-            c = tuple(map(int, rcg(id)))
-            l, t, r, b = group[['l', 't', 'r', 'b']].values[0].astype(int)
-            confidence = group['confidence'].values[0].astype(bool)
-            if confidence:
-                cv_rectangle(mat, (l,t), (r,b), c, 2)
-            else:
-                cv_rectangle(mat, (l,t), (r,b), c, 2, style='dashed')
+        cv.putText(mat, f'{frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
+        plot_track(mat, parser.get_gt, frameid, rcg=rcg, show_id=True)
         writer.write(mat)
         
     writer.release()

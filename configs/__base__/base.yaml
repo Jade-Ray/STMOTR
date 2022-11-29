@@ -46,6 +46,9 @@ referred_threshold:
 mot_type:
   desc: the type of moteval, which are 'track', 'mot' and 'prmot'
   value: mot
+mot_save:
+  desc: whether to save pred result as mot file
+  value: false
 
 # * Backbone
 backbone_name:
