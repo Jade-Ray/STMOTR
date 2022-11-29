@@ -75,7 +75,8 @@ class Trainer:
              "lr": cfg.lr_backbone},
         ]
         self.optimizer = torch.optim.AdamW(param_dicts, lr=cfg.lr, weight_decay=cfg.weight_decay)
-        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=[40], gamma=0.4, verbose=True)
+        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=cfg.lr_drop_milestones, 
+                                        gamma=cfg.lr_drop_gamma, verbose=True)
         self.grad_scaler = amp.GradScaler(enabled=cfg.enable_amp)
         self.max_norm = cfg.clip_max_norm
         

@@ -7,7 +7,18 @@ __base__:
 
 # * Train & Eval
 epochs:
-  value: 50
+  value: 110
+lr_drop_milestones:
+  desc: list of epoch to decay learning rate
+  value:
+    - 20
+    - 40
+    - 60
+    - 80
+    - 100
+lr_drop_gamma:
+  desc: multiplicative factor of learning rate decay, default 0.1
+  value: 0.4
 
 # * Deformable Transformer
 num_queries:

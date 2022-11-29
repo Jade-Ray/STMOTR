@@ -7,6 +7,14 @@ lr_backbone:
   value: 1.0e-5
 weight_decay:
   value: 1.0e-4
+lr_drop_milestones:
+  desc: list of epoch to decay learning rate
+  value:
+    - 40
+    - 80
+lr_drop_gamma:
+  desc: multiplicative factor of learning rate decay, default 0.1
+  value: 0.1
 clip_max_norm:
   desc: gradient clipping max norm
   value: 0.1

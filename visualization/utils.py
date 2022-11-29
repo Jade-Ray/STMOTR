@@ -1,4 +1,5 @@
 import warnings
+from collections import OrderedDict
 from typing import List
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ from scipy import interpolate
 import cv2 as cv
 
 import utils.logging as logging
+from datasets.video_parse import SingleVideoParserBase
 from datasets.transforms import NormalizeInverse
 from utils.meters import MotValMeter
 
@@ -155,6 +157,30 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
         logger.info(f'Pred Video {output_dir}/{sequence_name}.avi saving done.')
 
     return outputs[None]
+
+
+def plot_video_parser(parser: SingleVideoParserBase, output_dir=''):
+    video_path = f'{output_dir}/{parser.sequence_name}_gt.avi'
+    writer = cv.VideoWriter(video_path, cv.VideoWriter_fourcc(*'MJPG'), 10, 
+                            (parser.imWidth, parser.imHeight))
+    rcg = RCG()
+    pbar = tqdm(range(parser.start_frame_id, parser.end_frame_id+1))
+    for frameid in pbar:
+        pbar.set_description(f'ploting: {parser.sequence_name} {frameid}f')
+        mat = ImageConvert.to_mat_image(parser.get_image(frameid, opacity=0.75))
+        cv.putText(mat, f'{parser.sequence_name}: {frameid}', (5,40), cv.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv.LINE_AA)
+        for id, group in parser.get_gt([frameid]).groupby('track_id'):
+            c = tuple(map(int, rcg(id)))
+            l, t, r, b = group[['l', 't', 'r', 'b']].values[0].astype(int)
+            confidence = group['confidence'].values[0].astype(bool)
+            if confidence:
+                cv_rectangle(mat, (l,t), (r,b), c, 2)
+            else:
+                cv_rectangle(mat, (l,t), (r,b), c, 2, style='dashed')
+        writer.write(mat)
+        
+    writer.release()
+    logger.info(f'Pred Video {video_path} saving done.')
 
 
 def plot_table(cellText, figsize=(12, 7), rowLabels=None, colLabels=None, **kwargs):
@@ -390,3 +416,22 @@ def drawline(img,pt1,pt2,color,thickness=1,style='dotted',gap=10):
             if i%2==1:
                 cv.line(img,s,e,color,thickness)
             i+=1
+
+
+class RCG(object):
+    """random color generator"""
+    def __init__(self, max_len = 1000):
+        self.color_map = OrderedDict()
+        self.max_len = max_len
+    
+    def _random_generator(self, id):
+        color = tuple(np.uint8(np.random.choice(range(256), size=3)))
+        while len(self.color_map) >=  self.max_len:
+            self.color_map.popitem(last=False)
+        self.color_map[id] = color
+    
+    def __call__(self, id):
+        if id not in self.color_map.keys():
+            self._random_generator(id)
+        return self.color_map[id]
+

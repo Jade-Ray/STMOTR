@@ -32,9 +32,9 @@ class IgnoredRegion():
     
     Args:
         ignored_regions (list[tuple]): The Ignored Region format is the list and a rectangle (x, y, w, h) in item.
-        threshold (float): The threshold `(0.~1.)` of iou to detect weather obj in ignored_regions, 0 is overlap, 1 is non-overlap.
+        threshold (float): The threshold `(0.~1.)` of iou to detect weather obj in ignored_regions, above threshold means yes, and 1.0 means total overlap.
     """
-    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.1):
+    def __init__(self, ignored_regions: list[tuple], threshold: float = 0.9):
         self.ignored_regions = ignored_regions
         self.threshold = threshold
     
@@ -251,11 +251,14 @@ class UADETRACTransforms:
         scales = [224, 240, 256, 272, 288, 304, 320, 336, 352]
         
         if subset_type == 'train':
+            color_transforms = []
             if color_jitter_aug:
                 logger.info('Training with RandomColorJitter.')
-                color_transforms = [
-                    T.RandomApply([T.MotColorJitter(brightness=0.5, contrast=0.25, saturation=0.25, hue=0),]),
-                ]
+                color_transforms.append(
+                    T.RandomApply([
+                        T.MotColorJitter(brightness=0.5, contrast=0.25, saturation=0.25, hue=0),
+                    ])
+                )
             if rand_crop_aug:
                 logger.info('Training with RandomCrop.')
                 scale_transforms = [
