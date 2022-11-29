@@ -410,10 +410,10 @@ class MotValMeter(object):
             summary.insert(15, 'PRMOTA', np.hstack((prmota, prmota.mean())))
             summary.insert(16, 'PRMOTP', np.hstack((prmotp, prmotp.mean())))
             summary.insert(17, 'TH', np.hstack((thresholds, thresholds.mean())))
-            formatters['PRMOTA'] = formatters['MOTA']
-            formatters['PRMOTP'] = formatters['MOTP']
-            formatters['TH'] = formatters['MOTP']
-            markdownfmt += ('.1%', '.3', '.3')
+            formatters['PRMOTA'] = '.1f'.format
+            formatters['PRMOTP'] = '.1f'.format
+            formatters['TH'] = '.2f'.format
+            markdownfmt += ('.1f', '.1f', '.2f')
 
         self.summary = summary
         self.summary_str = summary.to_string(formatters=formatters)

@@ -194,4 +194,8 @@ def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
     figure = vis_utils.plot_pr_mot_curve(meter.precisions, meter.recalls, meter.motps,
                                          f'PR-MOTP {meter.pr_motp:.2f}')
     writer.add_figure(figure, f'{sequence_name} PR MOTP CURVE〽️')
-        
+
+    pr_record_md = meter.get_record_frame().to_markdown(
+        floatfmt=('.2f', '.3f','.3f', '.1f', '.1f'))
+    writer.add_text(f'{sequence_name} PR RECORD',
+                    f'\n- {sequence_name} 📄\n\n' + pr_record_md)
