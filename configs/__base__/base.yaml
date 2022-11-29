@@ -27,6 +27,9 @@ auto_resume:
 resume:
   desc: the model resume checkpoint
   value: ''
+pretrained_path:
+  desc: the model pretrained path
+  value: ''
 rng_seed:
   value: 42
 epochs:
