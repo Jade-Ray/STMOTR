@@ -286,7 +286,7 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
                                      frame_ids: np.ndarray):
     ncols, nrows = len(pil_imgs), attn_weights.shape[1]
     colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 14), layout='constrained')
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 10), layout='constrained')
     for j, ax_j in enumerate(axs):
         for i, (img, (l, t, r, b)) in enumerate(zip(pil_imgs, boxes)):
             ax = ax_j[i]
@@ -295,13 +295,12 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
             sca = ax.scatter(attn_points[i, j, :, 0], attn_points[i, j, :, 1], 
                              c=attn_weights[i, j], cmap=colormap,
                              vmin=0.0, vmax=1.0)
-            ax.plot(refer_points[i, j, 0], refer_points[i, j, 0], 'g+', markersize=8)
+            ax.plot(refer_points[i, j, 0], refer_points[i, j, 1], 'g+', markersize=8)
             ax.axis('off')
             if i == 0:
                 ax.set_ylabel(f'lvl {j+1}')
             if j == 0:
                 ax.set_title(f'frame {frame_ids[i]}')
-    fig.tight_layout()
     cbar = fig.colorbar(sca, ax=axs[:, :], shrink=0.7)
     cbar.set_ticks([0.02, 0.98])
     cbar.set_ticklabels (['low', 'high'])
