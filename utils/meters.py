@@ -14,7 +14,7 @@ from utils.timer import Timer
 import utils.logging as logging
 import utils.misc as misc
 import utils.distributed as du
-from utils.mot_tools import MotTracker, MotEval, PRMotEval
+from utils.mot_tools import MotTracker, MotEval, PRMotEval, prmot_formatters
 
 logger = logging.get_logger(__name__)
 
@@ -403,23 +403,40 @@ class MotValMeter(object):
         markdownfmt = ('.1%', '.1%', '.1%', '.1%', '.1%', '.1%',
                       '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.0f', '.1%', '.3')
         
+        self.summary_str = summary.to_string(formatters=formatters)
+        markdown_headline = "\n### MOT METRIC RESULT 📄\n\n"
+        self.summary_markdown = markdown_headline + summary.to_markdown(floatfmt=markdownfmt)
+        self.summary = summary
+        
         if self.mot_type == 'prmot':
             prmota = np.array([meter.pr_mota for meter in self.meters.values()])
             prmotp = np.array([meter.pr_motp for meter in self.meters.values()])
-            thresholds = np.array([meter.logit_threshold for meter in self.meters.values()])   
-            summary.insert(15, 'PRMOTA', np.hstack((prmota, prmota.mean())))
-            summary.insert(16, 'PRMOTP', np.hstack((prmotp, prmotp.mean())))
-            summary.insert(17, 'TH', np.hstack((thresholds, thresholds.mean())))
-            formatters['PRMOTA'] = '.1f'.format
-            formatters['PRMOTP'] = '.1f'.format
-            formatters['TH'] = '.2f'.format
-            markdownfmt += ('.1f', '.1f', '.2f')
-
-        self.summary = summary
-        self.summary_str = summary.to_string(formatters=formatters)
-        
-        markdown_headline = "\n### MOT METRIC RESULT 📄\n\n"
-        self.summary_markdown = markdown_headline + summary.to_markdown(floatfmt=markdownfmt)
+            prids = np.array([meter.pr_ids for meter in self.meters.values()])
+            prmt = np.array([meter.pr_mt for meter in self.meters.values()])
+            prml = np.array([meter.pr_ml for meter in self.meters.values()])
+            prfm = np.array([meter.pr_fm for meter in self.meters.values()])
+            prfp = np.array([meter.pr_fp for meter in self.meters.values()])
+            prfn = np.array([meter.pr_fn for meter in self.meters.values()])
+            thresholds = np.array([meter.logit_threshold for meter in self.meters.values()])
+            
+            summary = pd.DataFrame({
+                'PR-MOTA': np.hstack((prmota, prmota.mean())),
+                'PR-MOTP': np.hstack((prmotp, prmotp.mean())),
+                'PR-IDS': np.hstack((prids, prids.mean())),
+                'PR-MT': np.hstack((prmt, prmt.mean())),
+                'PR-ML': np.hstack((prml, prml.mean())),
+                'PR-FM': np.hstack((prfm, prfm.mean())),
+                'PR-FP': np.hstack((prfp, prfp.mean())),
+                'PR-FN': np.hstack((prfn, prfn.mean())),
+                'TH': np.hstack((thresholds, thresholds.mean())),
+            }, index=[name for name in self.meters.keys()]+['OVERALL'])
+            
+            formatters = prmot_formatters
+            markdownfmt = ('.1%', '.1%', '.1%', '.1f', '.1%', '.1%', '.1f', '.1f', '.1f', '.2f')
+            
+            self.summary_str = summary.to_string(formatters=formatters) + '\n' + self.summary_str
+            markdown_headline = "\n### PR-MOT METRIC RESULT 📄\n\n"
+            self.summary_markdown = markdown_headline + summary.to_markdown(floatfmt=markdownfmt) + '\n' + self.summary_markdown
                 
     def log_epoch_stats(self, cur_epoch):
         """

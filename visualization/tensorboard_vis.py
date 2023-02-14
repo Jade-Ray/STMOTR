@@ -125,7 +125,7 @@ def plot_motmeter_table(writer: TensorboardWriter,
 
 def plot_dec_atten(writer: TensorboardWriter, attn_dict, results, 
                    base_ds, obj_num=1, frame_step=1, cur_epoch=0,
-                   logit_threshold=0.2):
+                   logit_threshold=0.5):
     obj_counter = 0
     if 'attn_points' in attn_dict.keys():
         for i, (key, value) in enumerate(results.items()):
@@ -136,7 +136,7 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
             pred_queryids = torch.nonzero(mask, as_tuple=True)[0].cpu().numpy() # n
             pred_boxes = value['boxes'][mask].cpu().numpy()[:, ::frame_step]
             pred_frameids = value['frameids'].cpu().numpy()[::frame_step]
-            pil_imgs = sequence_parser.get_images(pred_frameids)
+            pil_imgs = sequence_parser.get_images(pred_frameids, opacity=0.75)
             img_size = torch.tensor([sequence_parser.imWidth, sequence_parser.imHeight],
                                     device=mask.device)
             
@@ -196,6 +196,6 @@ def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
     writer.add_figure(figure, f'{sequence_name} PR MOTP CURVE〽️')
 
     pr_record_md = meter.get_record_frame().to_markdown(
-        floatfmt=('.2f', '.3f','.3f', '.1f', '.1f'))
+        floatfmt=('.2f', '.3f','.3f', '.1%', '.1%', '.1f', '.1%', '.1%', '.1f', '.1f', '.1f'))
     writer.add_text(f'{sequence_name} PR RECORD',
                     f'\n- {sequence_name} 📄\n\n' + pr_record_md)

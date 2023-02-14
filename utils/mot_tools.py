@@ -252,7 +252,7 @@ class MotEval(MotTracker):
 
 class PRMotEval(MotEval):
     def __init__(self, auto_id=False, logit_threshold=0.2,
-                start_frameid=1, iou_threshold=0.75, num_thresholds=10):
+                start_frameid=1, iou_threshold=0.75, num_thresholds=50):
         super(PRMotEval, self).__init__(auto_id, logit_threshold, start_frameid, iou_threshold)
         self.thresholds = np.linspace(0, 1, num_thresholds, endpoint=False)
     
@@ -265,21 +265,86 @@ class PRMotEval(MotEval):
         return np.hstack((0, self.get_type_summary('recall'), 1))
     
     @property
+    def objs(self):
+        objs = self.get_type_summary('num_unique_objects')
+        assert objs[0] == objs.mean(), "gt number must be same in all frames"
+        return objs[0]
+    
+    @property
     def motas(self):
         return np.hstack((0, self.get_type_summary('mota'), 0))
     
     @property
     def motps(self):
         motps = 1 - self.get_type_summary('motp')
-        return np.hstack((0, motps, 0))
+        return np.hstack((motps[0], motps, 0))
+    
+    @property
+    def idss(self):
+        return np.hstack((0, self.get_type_summary('num_switches'), 0))
+    
+    @property
+    def mls(self):
+        mls = self.get_type_summary('mostly_lost') / self.objs
+        return np.hstack((0, mls, 0))
+    
+    @property
+    def mts(self):
+        mts = self.get_type_summary('mostly_tracked') / self.objs
+        return np.hstack((0, mts, 0))
+    
+    @property
+    def fms(self):
+        return np.hstack((0, self.get_type_summary('num_fragmentations'), 0))
+    
+    @property
+    def fps(self):
+        return np.hstack((0, self.get_type_summary('num_false_positives'), 0))
+    
+    @property
+    def fns(self):
+        fns = self.get_type_summary('num_misses')
+        return np.hstack((fns[0], fns, 0))
     
     @property
     def pr_mota(self):
-        return self.compute_prmot(self.motas) * 100
+        'Multiple Object Tracking Accuracy along the PR curve. This measure combines three error sources: false positives, missed targets and identity switches.'
+        return self.compute_prmot(self.motas)
     
     @property
     def pr_motp(self):
-        return self.compute_prmot(self.motps) * 100
+        'Multiple Object Tracking Precision along the PR curve. The misalignment between the annotated and the predicted bounding boxes.'
+        return self.compute_prmot(self.motps)
+    
+    @property
+    def pr_ids(self):
+        'The total number of identity switches along the PR curve.'
+        return self.compute_prmot(self.idss)
+    
+    @property
+    def pr_mt(self):
+        'Mostly tracked targets along the PR curve. The ratio of ground-truth trajectories that are covered by a track hypothesis for at least 80% of their respective life span.'
+        return self.compute_prmot(self.mts)
+    
+    @property
+    def pr_ml(self):
+        'Mostly lost targets along the PR curve. The ratio of ground-truth trajectories that are covered by a track hypothesis for at most 20% of their respective life span.'
+        return self.compute_prmot(self.mls)
+    
+    @property
+    def pr_fm(self):
+        'The total number of times a trajectory is fragmented (i.e. interrupted during tracking) along the PR curve.'
+        return self.compute_prmot(self.fms)
+    
+    @property
+    def pr_fp(self):
+        'The total number of false positives along the PR curve.'
+        return self.compute_prmot(self.fps)
+    
+    @property
+    def pr_fn(self):
+        'The total number of false negatives (missed targets) along the PR curve.'
+        return self.compute_prmot(self.fns)
     
     @property
     def ap(self) -> float:
@@ -323,6 +388,9 @@ class PRMotEval(MotEval):
         area = 0
         lpre, lrec, lmot = self.precisions[0], self.recalls[0], mot[0]
         for pre, rec, mot in zip(self.precisions[1:], self.recalls[1:], mot[1:]):
+            # don't compute null value
+            if np.isnan(pre) or np.isnan(rec) or np.isnan(mot):
+                continue
             area += (lmot + mot) * math.sqrt((pre - lpre)**2 + (rec - lrec)**2) / 2
             lpre, lrec, lmot = pre, rec, mot
         return area
@@ -332,13 +400,20 @@ class PRMotEval(MotEval):
         return pd.DataFrame({
             'Precisions' : self.precisions[sl],
             'Recalls' : self.recalls[sl],
-            'MOTAs' : self.motas[sl] * 100,
-            'MOTPs' : self.motps[sl] * 100,}, index=self.thresholds)
+            'MOTAs' : self.motas[sl],
+            'MOTPs' : self.motps[sl],
+            'IDSs': self.idss[sl],
+            'MLs': self.mls[sl],
+            'MTs': self.mts[sl],
+            'FMs': self.fms[sl],
+            'FNs': self.fns[sl],
+            'FPs': self.fps[sl]}, index=self.thresholds[::-1])
     
     def _get_motchallage_summary(self, summary):
         summary = mm.io.render_summary(
             summary, formatters=self.mh.formatters, namemap=mm.io.motchallenge_metric_names)
         return summary
+
 
 class AutoIncreseId(object):
     def __init__(self, init_id=0):
@@ -375,3 +450,15 @@ def hungarian_match_iou_vis(src, tgt, frameid):
         draw.rectangle(tgt[j], outline=color)
     
     img.show()
+
+prmot_formatters = {
+    'PR-MOTA': '{:.1%}'.format,
+    'PR-MOTP': '{:.1%}'.format,
+    'PR-IDS': '{:.1f}'.format,
+    'PR-MT': '{:.1%}'.format,
+    'PR-ML': '{:.1%}'.format,
+    'PR-FM': '{:.1f}'.format,
+    'PR-FP': '{:.1f}'.format,
+    'PR-FN': '{:.1f}'.format,
+    'TH': '{:.2f}'.format,
+}
