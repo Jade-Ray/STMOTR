@@ -351,6 +351,8 @@ class PRMotEval(MotEval):
         area = 0
         lpre, lrec = self.precisions[0], self.recalls[0]
         for pre, rec in zip(self.precisions[1:], self.recalls[1:]):
+            if np.isnan(pre) or np.isnan(rec):
+                continue
             area += (lpre + pre) * (rec - lrec) / 2
             lpre, lrec = pre, rec
         return area
@@ -386,8 +388,12 @@ class PRMotEval(MotEval):
     
     def compute_prmot(self, mot) -> float:
         area = 0
-        lpre, lrec, lmot = self.precisions[0], self.recalls[0], mot[0]
-        for pre, rec, mot in zip(self.precisions[1:], self.recalls[1:], mot[1:]):
+        # skip null mot meters
+        i = 0
+        while np.isnan(mot[i]):
+            i += 1
+        lpre, lrec, lmot = self.precisions[i], self.recalls[i], mot[i]
+        for pre, rec, mot in zip(self.precisions[i+1:], self.recalls[i+1:], mot[i+1:]):
             # don't compute null value
             if np.isnan(pre) or np.isnan(rec) or np.isnan(mot):
                 continue
