@@ -310,6 +310,8 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
 def plot_pr_curve(precisions: np.ndarray, recalls:np.ndarray, area:float,):
     fig, ax =plt.subplots()
     
+    mask = ~(np.isnan(precisions) | np.isnan(recalls))
+    recalls, precisions = recalls[mask], precisions[mask]
     ax.plot(recalls, precisions, '.--')
     ax.fill_between(recalls, precisions, alpha=0.4)
     
@@ -326,14 +328,16 @@ def plot_pr_mot_curve(precisions: np.ndarray, recalls:np.ndarray, mots: np.ndarr
                       title:str = 'PR MOT'):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-        
+    
+    mask = ~(np.isnan(precisions) | np.isnan(recalls) | np.isnan(mots))
+    recalls, precisions, mots = recalls[mask], precisions[mask], mots[mask]
     ax.plot3D(recalls, precisions, mots, '.--')
     
     ax.set_xlabel('recall')
     ax.set_xlim((0, 1))
     ax.set_ylabel('precision')
     ax.set_ylim((0, 1))
-    ax.set_zlabel('motp')
+    ax.set_zlabel('mot_meter')
     ax.set_zlim((0, 1))
     ax.set_title(title)
     ax.view_init(18, 235)
