@@ -265,16 +265,16 @@ class Trainer:
         self.train_meter.reset()
             
     @torch.no_grad()
-    def eval_epoch(self, cur_epoch):
+    def eval_epoch(self, cur_epoch, anno=''):
         # Evaluation mode enabled. The running stats would not be updated.
         self.model.eval()
-        
-        self.val_meter.iter_tic()
+
         if isinstance(self.cfg.board_vis_item, (list, tuple)):
             vis_item = self.cfg.board_vis_item
         elif self.cfg.board_vis_item == -1:
             vis_item = list(range(len(self.data_loader_val)))
 
+        self.val_meter.iter_tic()
         for cur_iter, (samples, targets) in enumerate(tqdm(self.data_loader_val)):
             # Transfer the data to the current GPU device.
             if self.cfg.num_gpus:
@@ -292,6 +292,7 @@ class Trainer:
             torch.cuda.synchronize()
             self.val_meter.iter_toc()
             self.val_meter.update(predictions_gathered)
+            self.val_meter.infer_toc()
             
             # Just plot first frame val results due to memory consumption
             if self.writer is not None and cur_iter == vis_item[0]:
@@ -305,10 +306,12 @@ class Trainer:
             torch.cuda.synchronize()
             self.val_meter.iter_tic()
         del samples
-        # Log epoch stats.
+        self.val_meter.infer_tic()
         self.val_meter.synchronize_between_processes()
         self.val_meter.summarize(save_pred=self.cfg.mot_save)
-        self.val_meter.log_epoch_stats(cur_epoch)
+        self.val_meter.infer_toc()
+        # Log epoch stats.
+        self.val_meter.log_epoch_stats(cur_epoch, anno=anno)
         if self.writer is not None and self.cfg.mot_type != 'track':
             self.writer.add_text(
                 'MOT Meter Summary💡', self.val_meter.summary_markdown, global_step=cur_epoch+1)
@@ -320,7 +323,7 @@ class Trainer:
         self.val_meter.reset()
 
     @torch.no_grad()
-    def visualization(self, vis_input=True, vis_mid=True, 
+    def visualization(self, cur_epoch, vis_input=True, vis_mid=True, 
                       vis_res=True, vis_ablation=True):
         logger.info('Model Visulization.')
         self.model.eval()
@@ -367,6 +370,7 @@ class Trainer:
                 logger.warning(f'Not supported Ablation transformer model {self.model._get_name()}')
                 hooks = []
         
+        self.val_meter.iter_tic()
         pbar = tqdm(self.data_loader_val)
         for cur_iter, (samples, targets) in enumerate(pbar):
             pbar.set_description(
@@ -402,6 +406,7 @@ class Trainer:
             torch.cuda.synchronize()
             self.val_meter.iter_toc()
             self.val_meter.update(predictions_gathered)
+            self.val_meter.infer_toc()
             
             # Visualization medium images
             if self.writer is not None and vis_mid and cur_iter in vis_item:
@@ -458,10 +463,14 @@ class Trainer:
             torch.cuda.synchronize()
             self.val_meter.iter_tic()
         del samples
-        # Log epoch stats.
+        
         logger.info('Summarizing meter...')
+        self.val_meter.infer_tic()
         self.val_meter.synchronize_between_processes()
         self.val_meter.summarize(save_pred=self.cfg.mot_save)
+        self.val_meter.infer_toc()
+        # Log epoch stats.
+        self.val_meter.log_epoch_stats(cur_epoch, anno='Visualizing Process...')
         
         if vis_ablation:
             for hook in hooks:
@@ -478,7 +487,8 @@ class Trainer:
                     vis_events= False if self.val_meter.is_pure_track() else self.cfg.board_vis_res_events,
                     plot_interval=self.cfg.board_vis_res_interval,
                     resize=self.cfg.board_vis_res_size)
-                self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
+                if final_video is not None:
+                    self.writer.add_video(final_video, tag="Video Pred Result", global_step=i)
                 del final_video
             
         if self.writer is not None and self.cfg.mot_type != 'track':

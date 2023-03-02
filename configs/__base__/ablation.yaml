@@ -15,7 +15,7 @@ board_vis_res_size:
     - 960
     - 540
 board_vis_res_interval:
-  desc: Visualization of finally result interval (start, end, step)
+  desc: Visualization of finally result interval (start, end, step) on board
   value: 
     - 1
     - 100

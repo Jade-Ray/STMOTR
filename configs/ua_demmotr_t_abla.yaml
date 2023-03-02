@@ -6,35 +6,18 @@ __base__:
     - __base__/ablation.yaml
 
 # * Train & Eval
-epochs:
-  value: 110
-lr_drop_milestones:
-  desc: list of epoch to decay learning rate
-  value:
-    - 20
-    - 40
-    - 60
-    - 80
-    - 100
-lr_drop_gamma:
-  desc: multiplicative factor of learning rate decay, default 0.1
-  value: 0.4
 mot_type:
   desc: the type of moteval, which are 'track', 'mot' and 'prmot'
-  value: prmot
+  value: mot
 
 # * Dataset Parameters
 dataset_name:
   value: ua
 dataset_path:
   value: data/UA_DETRAC
-color_jitter_aug:
-  value: true
-rand_crop_aug:
-  value: true
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
-  value: output/demmotr_ua_t
+  value: output/demmotr_ua_t_track
 num_workers:
   desc: number of workers to load data
   value: 4
@@ -47,7 +30,7 @@ eval_batch_size:
 board_enable:
   value: true
 board_dir:
-  value: runs/demmotr_ua_t
+  value: runs/demmotr_ua_t_track
 board_freq:
   value: 10
 
@@ -64,7 +47,7 @@ board_vis_res_enable:
   value: true
 board_vis_ablation_enable:
   desc: Visualization of attention ablation of DETR of DeformableDETR
-  value: false
+  value: true
 board_vis_item:
   desc: Visualization of dataloader item list, -1 means all
   value:

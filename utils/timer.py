@@ -68,3 +68,11 @@ class Timer:
             pause.
         """
         return self.seconds() / self._count_start
+
+
+def start_timer(timer: Timer):
+    """Reset a timer if timer is not Pause, otherwise resume it."""
+    if timer.is_paused():
+        timer.resume()
+    else:
+        timer.reset()

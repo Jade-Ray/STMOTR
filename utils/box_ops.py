@@ -121,11 +121,11 @@ def box_iou(boxes1: Union[Tensor, np.ndarray], boxes2: Union[Tensor, np.ndarray]
     """
     Return [N, M] IoU distance matrix between two boxes, with [x0, y0, x1, y1] format
     
-        IoU(a,b) = 1. - isect(a, b) / union(a, b)
+        IoU(a,b) = isect(a, b) / union(a, b)
     
     If set first_union, custom IoU just compute first boxes area as union
     
-        IoU(a,b) = 1. - isect(a, b) / union(a)
+        IoU(a,b) = isect(a, b) / union(a)
     """
     if isinstance(boxes1, np.ndarray):
         boxes1 = torch.tensor(boxes1)
