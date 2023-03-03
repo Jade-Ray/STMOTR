@@ -10,7 +10,7 @@ import torch
 import torch.distributed as dist
 import motmetrics as mm
 
-from utils.timer import Timer
+from utils.timer import Timer, start_timer
 import utils.logging as logging
 import utils.misc as misc
 import utils.distributed as du
@@ -110,12 +110,15 @@ class TrainMeter(object):
         self.epochs = epochs
         self.log_period = log_period
         self.max_epoch = epochs * epoch_iters
-        self.iter_timer = Timer()
-        self.data_timer = Timer()
-        self.net_timer = Timer()
+        self.init_timer()
         self.meters = defaultdict(partial(ScalarMeter, log_period))
         self.lr = None
         self.output_dir = output_dir
+    
+    def init_timer(self):
+        self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
     
     def reset(self):
         """
@@ -124,13 +127,14 @@ class TrainMeter(object):
         for meter in self.meters.values():
             meter.reset()
         self.lr = None
+        self.init_timer()
     
     def iter_tic(self):
         """
         Start to record time.
         """
-        self.iter_timer.reset()
-        self.data_timer.reset()
+        start_timer(self.iter_timer)
+        start_timer(self.data_timer)
 
     def iter_toc(self):
         """
@@ -141,7 +145,7 @@ class TrainMeter(object):
         
     def data_toc(self):
         self.data_timer.pause()
-        self.net_timer.reset()
+        start_timer(self.net_timer)
     
     def update(self, **kwargs):
         for k, v in kwargs.items():
@@ -174,16 +178,16 @@ class TrainMeter(object):
         """
         if (cur_iter + 1) % self.log_period != 0:
             return
-        eta_sec = self.iter_timer.seconds() * (
+        eta_sec = self.iter_timer.avg_seconds() * (
             self.max_epoch - (cur_epoch * self.epoch_iters + cur_iter + 1)
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
             "epoch": "{}/{}".format(cur_epoch + 1, self.epochs),
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
-            "dt": self.iter_timer.seconds(),
-            "dt_data": self.data_timer.seconds(),
-            "dt_net": self.net_timer.seconds(),
+            "dt": self.iter_timer.avg_seconds(),
+            "dt_data": self.data_timer.avg_seconds(),
+            "dt_net": self.net_timer.avg_seconds(),
             "eta": eta,
             "loss": {name: str(meter) for name, meter in self.meters.items()},
             "lr": str(self.lr),
@@ -286,26 +290,30 @@ class MotValMeter(object):
         self.epochs = epochs
         self.mot_type = mot_type
         self.init_meters(referred_threshold, start_frameid)
-        
-        self.iter_timer = Timer()
-        self.data_timer = Timer()
-        self.net_timer = Timer()
+        self.init_timer()
         self.output_dir = output_dir
     
     @property
     def sequence_names(self):
         return list(self.meters.keys())
-        
+    
+    def init_timer(self):
+        self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
+        self.infer_timer = Timer()
+    
     def reset(self):
         for meter in self.meters.values():
             meter.reset()
+        self.init_timer()
     
     def iter_tic(self):
         """
         Start to record time.
         """
-        self.iter_timer.reset()
-        self.data_timer.reset()
+        start_timer(self.iter_timer)
+        start_timer(self.data_timer)
 
     def iter_toc(self):
         """
@@ -313,10 +321,17 @@ class MotValMeter(object):
         """
         self.iter_timer.pause()
         self.net_timer.pause()
+        self.infer_tic()
 
     def data_toc(self):
         self.data_timer.pause()
-        self.net_timer.reset()
+        start_timer(self.net_timer)
+    
+    def infer_tic(self):
+        start_timer(self.infer_timer)
+        
+    def infer_toc(self):
+        self.infer_timer.pause()
     
     def init_meters(self, logit_threshold, start_frameid):
         if self.mot_type == 'track':
@@ -438,18 +453,28 @@ class MotValMeter(object):
             markdown_headline = "\n### PR-MOT METRIC RESULT 📄\n\n"
             self.summary_markdown = markdown_headline + summary.to_markdown(floatfmt=markdownfmt) + '\n' + self.summary_markdown
                 
-    def log_epoch_stats(self, cur_epoch):
+    def log_epoch_stats(self, cur_epoch: int, anno: str=""):
         """
         Log the stats of the current epoch.
         Args:
             cur_epoch (int): the number of current epoch.
+            anno (str): the annotation of current state.
         """
+        total_sequence_length = sum([seq.seqLength for seq in self.base_ds().data])
         stats = {
             "epoch": "{}/{}".format(cur_epoch + 1, self.epochs),
-            "time_diff": self.iter_timer.seconds(),
+            "total_seq_len": total_sequence_length,
+            "iter_time_diff": self.iter_timer.seconds(),
+            "iter_time_avg": self.iter_timer.avg_seconds(),
+            "iter_fps": "{:.2f}".format(total_sequence_length / self.iter_timer.seconds()),
+            "infer_time_diff": self.infer_timer.seconds(),
+            "infer_time_avg": self.infer_timer.avg_seconds(),
+            "infer_fps": "{:.2f}".format(total_sequence_length / self.infer_timer.seconds()),
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
             "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
+        if anno != "":
+            stats.update({"anno": anno})
         if not self.is_pure_track():
             for sequence_name in self.summary.index:
                 stats.update({f'{sequence_name}_mota': self.summary.loc[sequence_name, 'MOTA']})

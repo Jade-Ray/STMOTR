@@ -129,13 +129,12 @@ def plot_pred_as_video(sequence_name, meter, base_ds,
             outputs.append(ImageConvert.to_tensor(output))
         if writer is not None:
             writer.write(mat)
-    outputs = torch.stack(outputs, dim=0)
     
     if writer is not None:
         writer.release()
         logger.info(f'Pred Video {output_dir}/{sequence_name}.avi saving done.')
-
-    return outputs[None]
+        
+    return torch.stack(outputs, dim=0)[None] if len(outputs) !=0 else None
 
 
 def plot_mot_events(mat, meter, frameid, text_pos=(5, 10)):
