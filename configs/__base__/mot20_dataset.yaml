@@ -1,0 +1,19 @@
+# * MOT20 Dataset Parameters
+dataset_name:
+  value: mot20
+dataset_path:
+  value: data/MOT20
+color_jitter_aug:
+  value: false
+rand_crop_aug:
+  value: false
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/stmotr_mot20
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 2
+eval_batch_size:
+  value: 2

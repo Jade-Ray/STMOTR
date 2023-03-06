@@ -1,5 +1,8 @@
-# * Tensorboard Ablation
+# * Tensorboard Visualization Parameters
 # should enable Tensorboard first
+board_vis_item:
+  desc: Visualization of dataloader item list, -1 means all
+  value: -1
 board_vis_input_enable:
   desc: Visualization of dataloader input and ground truth 
   value: false
@@ -28,6 +31,9 @@ board_vis_res_save:
 board_vis_ablation_enable:
   desc: Visualization of attention ablation of DETR of DeformableDETR
   value: false
-board_vis_item:
-  desc: Visualization of dataloader item list, -1 means all
-  value: -1
+board_vis_ablation_num:
+  desc: The number of objects to visualize the attention ablation
+  value: 1
+board_vis_ablation_step:
+  desc: The frame step to visualize the attention ablation
+  value: 2

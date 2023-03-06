@@ -1,0 +1,23 @@
+# The evalate model setting
+__base__: 
+  desc: the base config yaml
+  value: 
+    - __base__/ua_dataset.yaml
+    - __base__/visualization.yaml
+    - __base__/deformable_stmotr.yaml
+
+# * Train & Eval
+mot_type:
+  desc: the type of moteval, which are 'track', 'mot' and 'prmot'
+  value: prmot
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/destmotr_ua_test
+
+# * Tensorboard
+board_enable:
+  value: true
+board_dir:
+  value: runs/destmotr_ua_test
+board_freq:
+  value: 10

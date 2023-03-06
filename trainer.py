@@ -336,7 +336,7 @@ class Trainer:
         if vis_ablation:
             if self.model._get_name() == 'DeformableMMOTR':
                 spatial_shapes, point_offsets, dec_attn_weights = [], [], []
-                reference_points, embed_coords = [], []
+                reference_points, box_offsets = [], []
                 
                 def referPoints_hook(module, input, output):
                     reference_points.append(input[1])
@@ -353,7 +353,7 @@ class Trainer:
                         lambda self, input, output: dec_attn_weights.append(output)  
                     ),
                     self.model.box_head.register_forward_hook(
-                        lambda self, input, output: embed_coords.append(output[-1])
+                        lambda self, input, output: box_offsets.append(output[-1])
                     )
                 ]
             elif self.model._get_name() == 'MMOTR':
@@ -420,11 +420,11 @@ class Trainer:
             # visualization ablation images
             if self.writer is not None and vis_ablation and cur_iter in vis_item:
                 if self.model._get_name() == 'DeformableMMOTR':
-                    t, b = embed_coords[-1].shape[:2]
+                    t, b = box_offsets[-1].shape[:2]
                     # reference points repeated on t and b. if vaild ratios=1, l same too.
                     ref_points = rearrange(reference_points[-1], '(t b) q l c -> b q t l c', t=t, b=b)
                     # bacuse embed_coords added by reference, so get ori coords
-                    embed_coords = rearrange(embed_coords[-1], 't b q c -> b q t c')[:, :, :, None, :2] - misc.inverse_sigmoid(ref_points)
+                    embed_coords = rearrange(box_offsets[-1], 't b q c -> b q t c')[:, :, :, None, :2] - misc.inverse_sigmoid(ref_points)
                     
                     nlevels, nheads, npoints = self.model.feature_levels, self.model.nheads, self.model.npoints
                     # calculate weights for every level to [bs, lq, t, nh, nl, np]:
@@ -458,7 +458,8 @@ class Trainer:
                     attn_dict = {}
                 tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
                                   self.val_meter.base_ds, cur_epoch=cur_iter,
-                                  obj_num=1, frame_step=2)
+                                  obj_num=self.cfg.board_vis_ablation_num, 
+                                  frame_step=self.cfg.board_vis_ablation_step)
             
             torch.cuda.synchronize()
             self.val_meter.iter_tic()

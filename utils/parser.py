@@ -80,6 +80,7 @@ def load_yaml_config(cfg: dict, config_path: Path):
     with open(config_path, 'r') as stream:
         config = yaml.safe_load(stream)
     config = {k: v['value'] for k, v in config.items()}
+    # recursively load base config, only append undefined keys, not overwrite existing keys.
     if '__base__' in config:
         base_path = config.pop('__base__')
         cfg = {**config, **cfg}
