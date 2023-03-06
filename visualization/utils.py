@@ -283,24 +283,38 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
                                      refer_points: np.ndarray, 
                                      pil_imgs: List[Image.Image], boxes: np.ndarray, 
                                      frame_ids: np.ndarray):
-    ncols, nrows = len(pil_imgs), attn_weights.shape[1]
+    """Visualize Deformable DETR encoder-decoder multi-head attention weights as num_frames x num_levels subplots.
+    
+    Args:
+        attn_weights: [num_frames, num_levels, (num_heads * num_points)]
+        attn_points: [num_frames, num_levels, (num_heads * num_points), 2]
+        refer_points: [num_frames, num_levels, 2]
+        pil_imgs: [num_frames]
+        boxes: [num_frames, 4]
+        frame_ids: [num_frames]
+    """
+    nrows, ncols = len(pil_imgs), attn_weights.shape[1]
     colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 10), layout='constrained')
-    for j, ax_j in enumerate(axs):
-        for i, (img, (l, t, r, b)) in enumerate(zip(pil_imgs, boxes)):
-            ax = ax_j[i]
-            ax.imshow(img)
-            ax.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2))
-            sca = ax.scatter(attn_points[i, j, :, 0], attn_points[i, j, :, 1], 
-                             c=attn_weights[i, j], cmap=colormap,
-                             vmin=0.0, vmax=1.0)
-            ax.plot(refer_points[i, j, 0], refer_points[i, j, 1], 'g+', markersize=8)
-            ax.axis('off')
-            if i == 0:
-                ax.set_ylabel(f'lvl {j+1}')
-            if j == 0:
-                ax.set_title(f'frame {frame_ids[i]}')
-    cbar = fig.colorbar(sca, ax=axs[:, :], shrink=0.7)
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(10, 8), dpi=160, layout='constrained')
+    for i, (img, (l, t, r, b), ax_row) in enumerate(zip(pil_imgs, boxes, axs)):
+        for j, ax_col in enumerate(ax_row):
+            ax_col.imshow(img)
+            ax_col.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2))
+            idx = np.argsort(attn_weights[i, j])
+            sca = ax_col.scatter(attn_points[i, j, idx, 0], attn_points[i, j, idx, 1], 
+                                 c=attn_weights[i, j, idx], s=30, cmap=colormap,
+                                 vmin=0.0, vmax=1.0)
+            ax_col.plot(refer_points[i, j, 0], refer_points[i, j, 1], 'g+', markersize=8)
+            ax_col.set_xticks([])
+            ax_col.xaxis.set_label_position('top')
+            ax_col.set_xlim([0, img.width])
+            ax_col.set_yticks([])
+            ax_col.set_ylim([img.height, 0])
+            if ax_col.is_first_row():
+                ax_col.set_xlabel(f'feature level {j+1}')
+            if ax_col.is_first_col():
+                ax_col.set_ylabel(f'frame {frame_ids[i]}')
+    cbar = fig.colorbar(sca, ax=axs[0, -1], shrink=0.8)
     cbar.set_ticks([0.02, 0.98])
     cbar.set_ticklabels (['low', 'high'])
     return fig

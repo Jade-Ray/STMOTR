@@ -1,36 +1,24 @@
-# The tiny model setting
+# The tracking prediction setting
 __base__: 
   desc: the base config yaml
   value: 
-    - __base__/deformable_mmotr.yaml
-    - __base__/ablation.yaml
+    - __base__/ua_dataset.yaml
+    - __base__/visualization.yaml
+    - __base__/deformable_stmotr.yaml
 
 # * Train & Eval
 mot_type:
   desc: the type of moteval, which are 'track', 'mot' and 'prmot'
   value: track
-
-# * Dataset Parameters
-dataset_name:
-  value: ua
-dataset_path:
-  value: data/UA_DETRAC
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
-  value: output/demmotr_ua_t_track
-num_workers:
-  desc: number of workers to load data
-  value: 4
-batch_size:
-  value: 4
-eval_batch_size:
-  value: 4
+  value: output/destmotr_ua_test
 
 # * Tensorboard
 board_enable:
   value: true
 board_dir:
-  value: runs/demmotr_ua_t_track
+  value: runs/destmotr_ua_test
 board_freq:
   value: 10
 

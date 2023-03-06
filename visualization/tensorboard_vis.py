@@ -185,7 +185,7 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
 
 def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
     figure = vis_utils.plot_pr_curve(meter.precisions, meter.recalls, meter.ap)
-    writer.add_figure(figure, f'{sequence_name} PR CURVE〽️')
+    writer.add_figure(figure, 'PR CURVE〽️')
     
     figure = vis_utils.plot_pr_mot_curve(meter.precisions, meter.recalls, meter.motas,
                                          f'PR-MOTA {meter.pr_mota:.2f}')
@@ -193,7 +193,7 @@ def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
     
     figure = vis_utils.plot_pr_mot_curve(meter.precisions, meter.recalls, meter.motps,
                                          f'PR-MOTP {meter.pr_motp:.2f}')
-    writer.add_figure(figure, f'{sequence_name} PR MOTP CURVE〽️')
+    writer.add_figure(figure, 'PR MOTP CURVE〽️')
 
     pr_record_md = meter.get_record_frame().to_markdown(
         floatfmt=('.2f', '.3f','.3f', '.1%', '.1%', '.1f', '.1%', '.1%', '.1f', '.1f', '.1f'))
