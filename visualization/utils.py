@@ -295,28 +295,30 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
     """
     nrows, ncols = len(pil_imgs), attn_weights.shape[1]
     colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(10, 8), dpi=160, layout='constrained')
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(11, 7.86), dpi=160, layout='constrained')
     for i, (img, (l, t, r, b), ax_row) in enumerate(zip(pil_imgs, boxes, axs)):
         for j, ax_col in enumerate(ax_row):
             ax_col.imshow(img)
-            ax_col.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2))
             idx = np.argsort(attn_weights[i, j])
             sca = ax_col.scatter(attn_points[i, j, idx, 0], attn_points[i, j, idx, 1], 
-                                 c=attn_weights[i, j, idx], s=30, cmap=colormap,
+                                 c=attn_weights[i, j, idx], s=20, cmap=colormap,
                                  vmin=0.0, vmax=1.0)
+            ax_col.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2))
             ax_col.plot(refer_points[i, j, 0], refer_points[i, j, 1], 'g+', markersize=8)
             ax_col.set_xticks([])
             ax_col.xaxis.set_label_position('top')
             ax_col.set_xlim([0, img.width])
             ax_col.set_yticks([])
             ax_col.set_ylim([img.height, 0])
-            if ax_col.is_first_row():
-                ax_col.set_xlabel(f'feature level {j+1}')
-            if ax_col.is_first_col():
-                ax_col.set_ylabel(f'frame {frame_ids[i]}')
-    cbar = fig.colorbar(sca, ax=axs[0, -1], shrink=0.8)
+            if ax_col.get_subplotspec().is_first_row():
+                ax_col.set_xlabel(f'feature level {j+1}', fontdict={"fontsize": 15})
+            if ax_col.get_subplotspec().is_first_col():
+                ax_col.set_ylabel(f'frame {frame_ids[i]}', fontdict={"fontsize": 15})
+    cbar = fig.colorbar(sca, ax=axs[0, -1], shrink=0.9, pad=0.01)
     cbar.set_ticks([0.02, 0.98])
-    cbar.set_ticklabels (['low', 'high'])
+    cbar.set_ticklabels(['low', 'high'])
+    cbar.ax.tick_params(labelsize=15)
+    fig.get_layout_engine().set(w_pad=1 / 72, h_pad=1 / 72, hspace=0, wspace=0)
     return fig
 
 
