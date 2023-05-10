@@ -315,10 +315,11 @@ class Trainer:
         if self.writer is not None and self.cfg.mot_type != 'track':
             self.writer.add_text(
                 'MOT Meter Summary💡', self.val_meter.summary_markdown, global_step=cur_epoch+1)
-            self.writer.add_scalars({
-                'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'MOTA'],
-                              'MOTP': self.val_meter.summary.loc['OVERALL', 'MOTP']},
-            }, global_step=cur_epoch+1)
+            if anno != 'Only Eval':
+                self.writer.add_scalars({
+                    'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'MOTA'],
+                                'MOTP': self.val_meter.summary.loc['OVERALL', 'MOTP']},
+                }, global_step=cur_epoch+1)
             
         self.val_meter.reset()
 

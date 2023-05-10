@@ -2,7 +2,7 @@
 __base__: 
   desc: the base config yaml
   value: 
-    - __base__/ua_dataset.yaml
+    - __base__/tunnel_dataset.yaml
     - __base__/visualization.yaml
     - __base__/deformable_stmotr.yaml
 
@@ -12,16 +12,16 @@ mot_type:
   value: prmot
 output_dir:
   desc: path where to save, keep empty for an auto-generated date-time labeled folder
-  value: output/destmotr_ua_test
+  value: output/destmotr_tunnel_test
 
 # * Dataset Parameters
 sampling_rate:
-  value: 21
+  value: 2
 
 # * Tensorboard
 board_enable:
   value: true
 board_dir:
-  value: runs/destmotr_ua_test
+  value: runs/destmotr_tunnel_test
 board_freq:
   value: 10

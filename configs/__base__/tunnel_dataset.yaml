@@ -1,0 +1,21 @@
+# * UA-DETRAC Dataset Parameters
+dataset_name:
+  value: tunnel
+dataset_path:
+  value: data/TUNNEL
+color_jitter_aug:
+  desc: enable color jitter augmentation
+  value: true
+rand_crop_aug:
+  desc: enable random crop augmentation
+  value: false
+output_dir:
+  desc: path where to save, keep empty for an auto-generated date-time labeled folder
+  value: output/stmotr_tunnel
+num_workers:
+  desc: number of workers to load data
+  value: 4
+batch_size:
+  value: 4
+eval_batch_size:
+  value: 4

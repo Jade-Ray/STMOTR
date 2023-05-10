@@ -1,4 +1,4 @@
-from datasets.tunnel import TunnelDataset
+from datasets.tunnel import TunnelDataset, TUNNEL_CLASSES
 from datasets.ua_detrac import UADETRAC, UA_CLASSES
 from datasets.mot20 import MOT20, MOT20_CLASSES
 
