@@ -322,6 +322,29 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
     return fig
 
 
+def plot_object_queries(query_points: np.ndarray, query_weights: np.ndarray):
+    """Visualize object queries as scatter plot.
+    
+    Args:
+        query_points: [num_queries, num_frame, num_data, 2]
+        query_weights: [num_queries, num_frame, num_data]
+    """
+    nrows, ncols = query_points.shape[0], query_points.shape[1]
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'g', 'r'])
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(10, 8), dpi=160, layout='constrained')
+    for i, ax_row in enumerate(axs):
+        for j, ax_col in enumerate(ax_row):
+            idx = np.argsort(query_weights[i, j])
+            ax_col.scatter(query_points[i, j, idx, 0], query_points[i, j, idx, 1],
+                           c=query_weights[i, j, idx], s=5, cmap=colormap, 
+                           vmin=0.0, vmax=1.0)
+            ax_col.set_xticks([])
+            ax_col.set_yticks([])
+            ax_col.set_xlim([0, 1])
+            ax_col.set_ylim([1, 0])
+    return fig
+
+
 def plot_pr_curve(precisions: np.ndarray, recalls:np.ndarray, area:float,):
     fig, ax =plt.subplots()
     

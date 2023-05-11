@@ -5,7 +5,7 @@ __base__:
 # * Train & Eval
 model_name:
   desc: name of model
-  value: deformable_mmotr
+  value: deformable_stmotr
 enable_amp:
   desc: whether to enable automatic mixed precision during training
   value: false

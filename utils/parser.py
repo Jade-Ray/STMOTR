@@ -27,7 +27,7 @@ def parse_args():
             overwrites the config loaded from file.
     """
     parser = argparse.ArgumentParser(
-        description="Provide MMOTR training and testing pipeline."
+        description="Provide STMOTR training and testing pipeline."
     )
     parser.add_argument(
         "--running_mode", 

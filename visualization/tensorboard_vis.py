@@ -183,6 +183,16 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
         logger.warning('The dec attn dict has non-understand key.')
 
 
+def plot_object_queries(writer: TensorboardWriter, boxes_records,
+                        query_num=5, frame_step=1): 
+    query_points = np.stack([query[:, ::frame_step, :2] for query in boxes_records], axis=2)
+    query_wh = np.stack([query[:, ::frame_step, 2:] for query in boxes_records], axis=2)
+    query_weights = 1 / (1 + np.exp(query_wh[..., 0] / query_wh[..., 1] - 1))
+    figure = vis_utils.plot_object_queries(
+        query_points[:query_num], query_weights[:query_num])
+    writer.add_figure(figure, f'Visualize of {query_num} Object Queries with {frame_step} frame step')
+
+
 def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):
     figure = vis_utils.plot_pr_curve(meter.precisions, meter.recalls, meter.ap)
     writer.add_figure(figure, 'PR CURVE〽️')

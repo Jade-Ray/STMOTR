@@ -10,7 +10,11 @@ from torch.utils.data import Dataset
 from datasets.video_parse import SingleVideoParserBase
 import datasets.transforms as T
 from utils.misc import nested_tensor_from_videos_list
+import utils.logging as logging
 
+logger = logging.get_logger(__name__)
+
+TUNNEL_CLASSES = {1: 'car'}
 
 class SingleVideoParser(SingleVideoParserBase):
     def __init__(self, **kwargs):
@@ -21,7 +25,7 @@ class SingleVideoParser(SingleVideoParserBase):
         df = pd.read_csv(self.labelDir, names=columns)
         
         def ltrb2wh(row):
-            return row['l'] - row['r'], row['t'] - row['b']
+            return row['r'] - row['l'], row['b'] - row['t']
         df['w'], df['h'] = zip(*df.apply(ltrb2wh, axis=1))
         
         self.gt = df
@@ -29,24 +33,23 @@ class SingleVideoParser(SingleVideoParserBase):
     def convert2mate(self, frame_ids) -> dict:
         df_gt = self.get_gt(frame_ids)
         video_mate = defaultdict(list)
-        key = ['track_ids', 'labels', 'referred', 'boxes', 'visibilities']
+        key = ['track_ids', 'labels', 'boxes', 'confidences']
         for track_id, track_group in df_gt.groupby('track_id'):
             video_mate['track_ids'].append(track_id)
             video_mate['labels'].append(int(track_group['object_type'].mode()))
-            referred, bboxes, vises = [], [], []
+            bboxes, confidences = [], []
             for i in frame_ids:
                 if i in track_group['frame_index'].values:
-                    referred.append(True)
                     bboxes.append(track_group.loc[track_group['frame_index'] == i, ['l', 't', 'r', 'b']].values[0])
-                    vises.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
+                    confidences.append(track_group.loc[track_group['frame_index'] == i, 'visibility'].values[0])
                 else:
-                    referred.append(False)
                     bboxes.append(np.zeros(4, dtype=float))
-                    vises.append(0.)
-            video_mate['referred'].append(np.array(referred))
+                    confidences.append(0)
             video_mate['boxes'].append(np.array(bboxes))
-            video_mate['visibilities'].append(np.array(vises))
+            video_mate['confidences'].append(np.array(confidences))
         video_mate = {k: np.array(video_mate[k]) for k in key}
+        video_mate['boxes'].reshape(-1, len(frame_ids), 4)
+        video_mate['confidences'].reshape(-1, len(frame_ids))
         video_mate['frame_ids'] = frame_ids
         video_mate['orig_size'] = (self.imWidth, self.imHeight)
         video_mate['video_name'] = self.sequence_name
@@ -82,11 +85,15 @@ class Tunnel(Dataset):
         sequence_file = Path(__file__).parent / f'sequence_list_{self.subset_type}.txt'
         assert sequence_file.exists()
         
-        data_folder = self.dataset_path / self.subset_type
+        if self.subset_type == 'train' or self.subset_type == 'val':
+            data_folder = self.dataset_path / 'train'
+        else:
+            data_folder = self.dataset_path / 'test'
+
         sequence_file_list = np.loadtxt(sequence_file, dtype=str)
         sequence_file_list = sequence_file_list if sequence_file_list.ndim > 0 else [sequence_file_list]
         
-        files_path = data_folder.glob('K258-*')
+        files_path = data_folder.glob('K258*')
         files_selected_path = [file for file in files_path if file.stem in sequence_file_list]
         assert len(files_selected_path) > 0
         
@@ -132,28 +139,65 @@ class Tunnel(Dataset):
     
 
 class TunnelTransforms:
-    def __init__(self, subset_type, horizontal_flip_augmentations, resize_and_crop_augmentations,
-                 train_size_list, train_max_size, eval_size_list, eval_max_size, **kwargs):
-        normalize = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        scales = train_size_list  # size is slightly smaller than eval size below to fit in GPU memory
-        transforms = []
-        if horizontal_flip_augmentations and subset_type == 'train':
-            transforms.append(T.RandomHorizontalFlip())
-        if resize_and_crop_augmentations:
-            if subset_type == 'train':
-                transforms.append(T.RandomResize(scales, max_size=train_max_size))
-            elif subset_type == 'valid' or subset_type == 'test':
-                transforms.append(T.RandomResize(eval_size_list, max_size=eval_max_size))
+    def __init__(self, subset_type, color_jitter_aug=False, rand_crop_aug=False, **kwargs):
+        
+        normalize = T.Compose([
+            T.MotToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+        
+        scales = [224, 240, 256, 272, 288, 304, 320, 336, 352]
+        
+        if subset_type == 'train':
+            color_transforms = []
+            if color_jitter_aug:
+                logger.info('Training with RandomColorJitter.')
+                color_transforms.append(
+                    T.RandomApply([
+                        T.MotColorJitter(brightness=0.5, contrast=0.25, saturation=0.25, hue=0),
+                    ])
+                )
+            if rand_crop_aug:
+                logger.info('Training with RandomCrop.')
+                scale_transforms = [
+                    T.MotRandomFrozenTime(),
+                    T.MotRandomHorizontalFlip(),
+                    T.RandomSelect(
+                        T.MotRandomResize(scales, max_size=626),
+                        T.Compose([
+                            T.MotRandomResize([140, 170, 200]),
+                            T.FixedMotRandomCrop(112, 200),
+                            T.MotRandomResize(scales, max_size=626),
+                        ])
+                    ),
+                    T.MotConfidenceFilter(),
+                    normalize,
+                ]
             else:
-                raise ValueError(f'No {subset_type} transform strategy.')
-        transforms.extend([T.ToTensor(), normalize])
-        self.transforms = T.Compose(transforms)
+                scale_transforms = [
+                    T.MotRandomFrozenTime(),
+                    T.MotRandomHorizontalFlip(),
+                    T.MotRandomResize(scales, max_size=626),
+                    T.MotConfidenceFilter(),
+                    normalize,
+                ]
+            
+            self.transforms = T.Compose(color_transforms + scale_transforms)
+        
+        elif subset_type == 'val' or subset_type == 'test':
+            self.transforms = T.Compose([
+                T.MotRandomResize([352], max_size=626),
+                normalize,
+            ])
+        else:
+            raise ValueError(f'Unknow {subset_type} transform strategy.')
     
     def __call__(self, imgs, video_mate):
         num_frame = len(imgs)
         targets = {
             'boxes': torch.tensor(video_mate['boxes']).view(-1, num_frame, 4),
-            'referred': torch.tensor(video_mate['referred']).view(-1, num_frame),
+            'referred': torch.tensor(video_mate['confidences']).view(-1, num_frame),
+            'labels': torch.tensor(video_mate['labels']),
             'orig_size': torch.tensor(video_mate['orig_size']),
             'frame_indexes': torch.tensor(video_mate['frame_ids'])
         }

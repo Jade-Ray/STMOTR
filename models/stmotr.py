@@ -11,7 +11,7 @@ from models.postprocessing import BasePostProcess
 from utils.misc import NestedTensor
 
 
-class MMOTR(nn.Module):
+class STMOTR(nn.Module):
     def __init__(self, num_queries, aux_loss=False, **kwargs):
         super().__init__()
         self.backbone = backbone_build(**kwargs)
@@ -72,7 +72,7 @@ class MLP(nn.Module):
 
 
 def build(args):
-    model = MMOTR(**vars(args))
+    model = STMOTR(**vars(args))
     matcher = build_matcher(args)
     weight_dict = {'loss_is_referred': args.is_referred_loss_coef,
                    'loss_boxes': args.boxes_loss_coef,

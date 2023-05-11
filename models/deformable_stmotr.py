@@ -11,7 +11,7 @@ from models.postprocessing import BasePostProcess
 from utils.misc import NestedTensor, inverse_sigmoid
 
 
-class DeformableMMOTR(nn.Module):
+class DeformableSTMOTR(nn.Module):
     def __init__(self, num_queries, start_level=1, extra_levels=1, aux_loss=False, **kwargs):
         super().__init__()
         self.backbone = backbone_build(**kwargs)
@@ -118,7 +118,7 @@ class MLP(nn.Module):
 
 
 def build(args):
-    model = DeformableMMOTR(**vars(args))
+    model = DeformableSTMOTR(**vars(args))
     matcher = build_matcher(args, referred_focal_loss=True)
     weight_dict = {'loss_is_referred': args.is_referred_loss_coef,
                    'loss_boxes': args.boxes_loss_coef,

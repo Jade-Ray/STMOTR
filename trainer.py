@@ -1,5 +1,5 @@
 """
-This file contains a Trainer class which handles the training and evaluation of MMOTR.
+This file contains a Trainer class which handles the training and evaluation of STMOTR.
 """
 import pprint
 import gc
@@ -315,17 +315,24 @@ class Trainer:
         if self.writer is not None and self.cfg.mot_type != 'track':
             self.writer.add_text(
                 'MOT Meter Summary💡', self.val_meter.summary_markdown, global_step=cur_epoch+1)
-            self.writer.add_scalars({
-                'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'MOTA'],
-                              'MOTP': self.val_meter.summary.loc['OVERALL', 'MOTP']},
-            }, global_step=cur_epoch+1)
+            if anno != 'Only Eval':
+                self.writer.add_scalars({
+                    'MOT_METER': {'MOTA': self.val_meter.summary.loc['OVERALL', 'MOTA'],
+                                'MOTP': self.val_meter.summary.loc['OVERALL', 'MOTP']},
+                }, global_step=cur_epoch+1)
             
         self.val_meter.reset()
 
     @torch.no_grad()
-    def visualization(self, cur_epoch, vis_input=True, vis_mid=True, 
-                      vis_res=True, vis_ablation=True):
+    def visualization(self, cur_epoch=None):
         logger.info('Model Visulization.')
+        cur_epoch = self.epoch - 1 if cur_epoch is None else cur_epoch
+        vis_input = self.cfg.board_vis_input_enable
+        vis_mid = self.cfg.board_vis_mid_enable
+        vis_res = self.cfg.board_vis_res_enable
+        vis_dec = self.cfg.abla_vis_decattn_enable
+        vis_obj_query = self.cfg.abla_vis_objquery_enable
+        vis_track_query = self.cfg.abla_vis_traquery_enable
         self.model.eval()
         
         if isinstance(self.cfg.board_vis_item, (list, tuple)):
@@ -333,8 +340,8 @@ class Trainer:
         elif self.cfg.board_vis_item == -1:
             vis_item = list(range(len(self.data_loader_val)))
             
-        if vis_ablation:
-            if self.model._get_name() == 'DeformableMMOTR':
+        if vis_dec:
+            if self.model._get_name() == 'DeformableSTMOTR':
                 spatial_shapes, point_offsets, dec_attn_weights = [], [], []
                 reference_points, box_offsets = [], []
                 
@@ -356,7 +363,7 @@ class Trainer:
                         lambda self, input, output: box_offsets.append(output[-1])
                     )
                 ]
-            elif self.model._get_name() == 'MMOTR':
+            elif self.model._get_name() == 'STMOTR':
                 conv_features, dec_attn_weights = [], []
                 hooks = [
                     self.model.transformer.register_forward_hook(
@@ -369,6 +376,9 @@ class Trainer:
             else:
                 logger.warning(f'Not supported Ablation transformer model {self.model._get_name()}')
                 hooks = []
+        
+        if vis_obj_query or vis_track_query:
+            pred_boxes_recods = []
         
         self.val_meter.iter_tic()
         pbar = tqdm(self.data_loader_val)
@@ -394,6 +404,12 @@ class Trainer:
             self.val_meter.data_toc()
 
             outputs = self.model(samples)
+            
+            if vis_obj_query or vis_track_query:
+                pred_boxes = rearrange(outputs['pred_boxes'], 't b n c -> b n t c')
+                for batch_boxes in pred_boxes:
+                    pred_boxes_recods.append(batch_boxes.cpu().numpy())
+
             orig_sample_sizes = torch.stack([t["orig_size"] for t in targets], dim=0).cuda(non_blocking=True)
             frameids = torch.stack([t["frame_indexes"] for t in targets], dim=0).cuda(non_blocking=True)
             predictions = self.postprocessor(outputs, orig_sample_sizes)
@@ -418,8 +434,8 @@ class Trainer:
                 del medium_video
             
             # visualization ablation images
-            if self.writer is not None and vis_ablation and cur_iter in vis_item:
-                if self.model._get_name() == 'DeformableMMOTR':
+            if self.writer is not None and vis_dec and cur_iter in vis_item:
+                if self.model._get_name() == 'DeformableSTMOTR':
                     t, b = box_offsets[-1].shape[:2]
                     # reference points repeated on t and b. if vaild ratios=1, l same too.
                     ref_points = rearrange(reference_points[-1], '(t b) q l c -> b q t l c', t=t, b=b)
@@ -449,7 +465,7 @@ class Trainer:
                                 'spatial_shapes': offset_normalizer,
                                 'expand_points': expand_points.sigmoid()}
                     
-                elif self.model._get_name() == 'MMOTR':
+                elif self.model._get_name() == 'STMOTR':
                     t, b, _, h, w = conv_features[-1].shape
                     attn_dict = {
                         'dec_attn_weights': rearrange(dec_attn_weights[-1], '(t b) q (h w) -> b q t h w', t=t, b=b, h=h, w=w),
@@ -458,8 +474,8 @@ class Trainer:
                     attn_dict = {}
                 tb.plot_dec_atten(self.writer, attn_dict, predictions_gathered, 
                                   self.val_meter.base_ds, cur_epoch=cur_iter,
-                                  obj_num=self.cfg.board_vis_ablation_num, 
-                                  frame_step=self.cfg.board_vis_ablation_step)
+                                  obj_num=self.cfg.abla_vis_obj_num, 
+                                  frame_step=self.cfg.abla_vis_frame_step)
             
             torch.cuda.synchronize()
             self.val_meter.iter_tic()
@@ -473,10 +489,15 @@ class Trainer:
         # Log epoch stats.
         self.val_meter.log_epoch_stats(cur_epoch, anno='Visualizing Process...')
         
-        if vis_ablation:
+        if vis_dec:
             for hook in hooks:
                 hook.remove()
-            
+        
+        if vis_obj_query:
+            tb.plot_object_queries(self.writer, pred_boxes_recods,
+                                   query_num=self.cfg.abla_vis_que_num,
+                                   frame_step=self.cfg.abla_vis_frame_step)
+        
         # visualization final images
         if self.writer is not None and vis_res:
             logger.info('Visualizing predict video...')

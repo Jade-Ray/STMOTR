@@ -5,7 +5,7 @@ __base__:
 # * Train & Eval
 model_name:
   desc: name of model
-  value: mmotr
+  value: stmotr
 
 # * Transformer
 num_encoder_layers:
