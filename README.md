@@ -3,8 +3,8 @@
 ## Require
 
 ```shell
-conda create -n mmotr python=3.9
-conda activate mmotr
+conda create -n stmotr python=3.9
+conda activate stmotr
 
 conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
 
@@ -25,5 +25,5 @@ To train on a single machine with 3 gpus for 50 epochs run:
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0,1,2
-python main.py --running_mode train --shard_id 0 --num_shards 1 --num_gpus 3 --cfg configs/ua_demmotr_t.yaml
+python main.py --running_mode train --shard_id 0 --num_shards 1 --num_gpus 3 --cfg configs/ua_destmotr_train.yaml
 ```
