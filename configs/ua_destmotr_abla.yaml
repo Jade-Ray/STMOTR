@@ -43,7 +43,7 @@ abla_vis_obj_num:
   value: 10
 abla_vis_que_num:
   desc: The number of queries to visualize the queries ablation
-  value: 5
+  value: 10
 abla_vis_frame_step:
   desc: The frame step to visualize the ablation
-  value: 2
+  value: 1

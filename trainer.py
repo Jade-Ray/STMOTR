@@ -493,10 +493,11 @@ class Trainer:
             for hook in hooks:
                 hook.remove()
         
-        if vis_obj_query:
-            tb.plot_object_queries(self.writer, pred_boxes_recods,
-                                   query_num=self.cfg.abla_vis_que_num,
-                                   frame_step=self.cfg.abla_vis_frame_step)
+        if vis_obj_query or vis_track_query:
+            tb.plot_queries(self.writer, pred_boxes_recods,
+                            obj_query=vis_obj_query, track_query=vis_track_query,
+                            query_num=self.cfg.abla_vis_que_num,
+                            frame_step=1)
         
         # visualization final images
         if self.writer is not None and vis_res:
