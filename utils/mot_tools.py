@@ -208,7 +208,7 @@ class MotEval(MotTracker):
     def summarize(self):
         assert self.gt is not None, "MOT EVAL must have gt!"
         pbar = tqdm(self.frameids)
-        for frameid in self.frameids:
+        for frameid in pbar:
             pbar.set_description(f'summerizing: {frameid}f')
             self._summarize_frame(frameid)
     

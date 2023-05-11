@@ -183,14 +183,21 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
         logger.warning('The dec attn dict has non-understand key.')
 
 
-def plot_object_queries(writer: TensorboardWriter, boxes_records,
-                        query_num=5, frame_step=1): 
+def plot_queries(writer: TensorboardWriter, boxes_records, obj_query=False,
+                 track_query=False, query_num=5, frame_step=1): 
     query_points = np.stack([query[:, ::frame_step, :2] for query in boxes_records], axis=2)
     query_wh = np.stack([query[:, ::frame_step, 2:] for query in boxes_records], axis=2)
-    query_weights = 1 / (1 + np.exp(query_wh[..., 0] / query_wh[..., 1] - 1))
-    figure = vis_utils.plot_object_queries(
-        query_points[:query_num], query_weights[:query_num])
-    writer.add_figure(figure, f'Visualize of {query_num} Object Queries with {frame_step} frame step')
+    query_aspect = (query_wh[..., 0] / query_wh[..., 1] - 1) * 1.8
+    query_weights = 1 / (1 + np.exp(query_aspect))
+    query_idx = np.random.choice(query_points.shape[0], query_num, replace=False)
+    if obj_query:
+        figure = vis_utils.plot_object_queries(
+            query_points[query_idx], query_weights[query_idx])
+        writer.add_figure(figure, f'Visualize of {query_idx} Object Queries with {frame_step} frame step')
+    if track_query:
+        figure = vis_utils.plot_track_queries(
+            query_points[query_idx], query_weights[query_idx])
+        writer.add_figure(figure, f'Visualize of {query_idx} Track Queries')
 
 
 def plot_prmot(writer: TensorboardWriter, meter: PRMotEval, sequence_name: str):

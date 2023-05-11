@@ -322,26 +322,58 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
     return fig
 
 
-def plot_object_queries(query_points: np.ndarray, query_weights: np.ndarray):
+def plot_object_queries(queries_points: np.ndarray, queries_weights: np.ndarray):
     """Visualize object queries as scatter plot.
     
     Args:
-        query_points: [num_queries, num_frame, num_data, 2]
-        query_weights: [num_queries, num_frame, num_data]
+        queries_points: [num_queries, num_frame, num_data, 2]
+        queries_weights: [num_queries, num_frame, num_data]
     """
-    nrows, ncols = query_points.shape[0], query_points.shape[1]
+    nrows, ncols = queries_points.shape[0], queries_points.shape[1]
     colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'g', 'r'])
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(10, 8), dpi=160, layout='constrained')
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(8, 10), dpi=160, layout='constrained')
     for i, ax_row in enumerate(axs):
         for j, ax_col in enumerate(ax_row):
-            idx = np.argsort(query_weights[i, j])
-            ax_col.scatter(query_points[i, j, idx, 0], query_points[i, j, idx, 1],
-                           c=query_weights[i, j, idx], s=5, cmap=colormap, 
+            idx = np.argsort(queries_weights[i, j])
+            ax_col.scatter(queries_points[i, j, idx, 0], queries_points[i, j, idx, 1],
+                           c=queries_weights[i, j, idx], s=2, cmap=colormap, 
                            vmin=0.0, vmax=1.0)
             ax_col.set_xticks([])
             ax_col.set_yticks([])
             ax_col.set_xlim([0, 1])
             ax_col.set_ylim([1, 0])
+            ax_col.set_aspect('equal')
+            ax_col.set_adjustable('box')
+    fig.get_layout_engine().set(w_pad=1 / 72, h_pad=1 / 72, hspace=0, wspace=0)
+    return fig
+
+
+def plot_track_queries(queries_points: np.ndarray, queries_weights: np.ndarray):
+    """Visualize track queries as scatter plot.
+    
+    Args:
+        queries_points: [num_queries, num_frame, num_data, 2]
+        queries_weights: [num_queries, num_frame, num_data]
+    """
+    ncols = 5
+    nrows = np.ceil(queries_points.shape[0] / ncols).astype(int)
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'g', 'r'])
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(10, 4), dpi=160, layout='constrained')
+    for ax, qu_points, qu_weights in zip(axs.flatten(), queries_points, queries_weights):
+        track_weights = np.mean(qu_weights, axis=0)
+        idx = np.argsort(track_weights)
+        coefs = np.stack([np.polyfit(points[:, 0], points[:, 1], 1) 
+                          for points in qu_points.transpose(1, 0, 2)])
+        mv_coef_a = 1 / (1 + np.exp(coefs[idx, 0]))
+        mv_coef_b = coefs[idx, 1]
+        ax.scatter(mv_coef_a, mv_coef_b, c=track_weights[idx], 
+                           s=2, cmap=colormap, vmin=0.0, vmax=1.0)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
+        ax.set_aspect('equal')
+    fig.get_layout_engine().set(w_pad=1 / 72, h_pad=1 / 72, hspace=0, wspace=0)
     return fig
 
 
