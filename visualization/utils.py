@@ -4,6 +4,7 @@ from typing import List
 from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+import mpl_toolkits.mplot3d.art3d as art3d
 
 import torch
 from torch import Tensor
@@ -244,38 +245,45 @@ def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: List[Im
     return fig
 
 
-def plot_deformable_attn_weights(attn_weights: np.ndarray, attn_points: np.ndarray,
-                                      spatial_shapes: np.ndarray,
-                                      refer_points: np.ndarray, expand_points: np.ndarray, 
-                                      pil_imgs: List[Image.Image], boxes: np.ndarray, 
-                                      query_id: int, frame_ids: np.ndarray):
-    """Visualize Deformable DETR encoder-decoder multi-head attention weights."""
-    # assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
-    # assert len({len(attn_weights), len(attn_points), len(refer_points), 
-    #             len(expand_points), len(spatial_shapes)}) == 1
-    ncols, nrows = len(pil_imgs) + 1, len(attn_weights)
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 14))
-    for nl, (ax_j, weight, point, shape, refer_point, expand_point) in enumerate(zip \
-        (axs, attn_weights, attn_points, spatial_shapes, refer_points, expand_points)):
-        ax = ax_j[0]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            f = interpolate.interp2d(point[:, 0], point[:, 1], weight)
-            ax.imshow(f(np.arange(0, shape[0], 1), np.arange(0, shape[1], 1)))
-        ax.plot(refer_point[0], refer_point[1], 'k+', markersize=8)
-        ax.axis('off')
-        ax.set_title(f'level: {nl+1}')
-        
-        for nf, (img, (l, t, r, b), f_point, frameid) in enumerate(zip \
-            (pil_imgs, boxes, expand_point, frame_ids)):
-            ax = ax_j[nf+1]
-            ax.imshow(img)
-            ax.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='blue', linewidth=2))
-            ax.scatter(f_point[:, 0], f_point[:, 1], s=[6]*len(weight), c=weight)
-            ax.plot(l+(r-l)/2, t+(b-t)/2, 'g+', markersize=8)
-            ax.axis('off')
-            ax.set_title(f'frame id: {frameid} // query id: {query_id}')
-    fig.tight_layout()
+def plot_deformable_attn_weights(attn_weights: np.ndarray, attn_points: np.ndarray, 
+                                refer_points: np.ndarray, 
+                                pil_imgs: List[Image.Image], boxes: np.ndarray, 
+                                frame_ids: np.ndarray):
+    """Visualize Deformable DETR encoder-decoder multi-head attention weights as 3d.
+    
+    Args:
+        attn_weights: [num_frames, (num_levels * num_heads * num_points)]
+        attn_points: [num_frames, (num_levels * num_heads * num_points), 2]
+        refer_points: [num_frames, 2]
+        pil_imgs: [num_frames]
+        boxes: [num_frames, 4]
+        frame_ids: [num_frames]
+    """
+    fig = plt.figure(figsize=(8, 8), dpi=160)
+    ax = fig.add_subplot(projection='3d')
+    w, h = pil_imgs[0].size
+    num_points = attn_weights.shape[1]
+    num_frame = len(pil_imgs)
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
+    
+    idx = np.argsort(attn_weights, axis=1)
+    ax.scatter3D(np.take_along_axis(np.repeat(frame_ids, num_points).reshape(num_frame, -1), idx, axis=1),
+                 np.take_along_axis(attn_points[..., 0], idx, axis=1), 
+                 np.take_along_axis(attn_points[..., 1], idx, axis=1),
+                 c=np.take_along_axis(attn_weights, idx, axis=1),
+                 s=10, cmap=colormap, vmin=0.0, vmax=1.0)
+    ax.plot3D(frame_ids, refer_points[..., 0], refer_points[..., 1], 'g+', markersize=8)
+    for i, (l, t, r, b) in zip(frame_ids, boxes):
+        rec = plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2)
+        ax.add_patch(rec)
+        art3d.pathpatch_2d_to_3d(rec, z=i, zdir="x")
+    
+    ax.set_xlabel('frame')
+    ax.set_xlim((frame_ids[0], frame_ids[-1]))
+    ax.set_ylabel('width')
+    ax.set_ylim((0, w))
+    ax.set_zlabel('height')
+    ax.set_zlim((h, 0))
     return fig
 
 

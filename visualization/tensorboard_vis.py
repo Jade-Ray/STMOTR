@@ -143,7 +143,7 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
             for boxes, queryid in zip(pred_boxes, pred_queryids):
                 if obj_counter >= obj_num:
                     break
-                attn_weight = rearrange(attn_dict['dec_attn_weights'][i, queryid],
+                attn_weight = rearrange(attn_dict['dec_attn_weights'][i, queryid, ::frame_step],
                                         't h l p -> t l (h p)')
                 attn_point = rearrange(attn_dict['expand_points'][i, queryid, ::frame_step], 
                                        't h l p c -> t l (h p) c') * img_size
@@ -152,7 +152,13 @@ def plot_dec_atten(writer: TensorboardWriter, attn_dict, results,
                 figure = vis_utils.plot_deformable_lvl_attn_weights(
                     attn_weight.cpu().numpy(), attn_point.cpu().numpy(),
                     refer_point.cpu().numpy(), pil_imgs, boxes, pred_frameids)
-                writer.add_figure(figure, 'Deformable DETR encoder-decoder multi-head attention weights', 
+                writer.add_figure(figure, 'Deformable DETR LVL encoder-decoder multi-head attention weights', 
+                                  obj_counter + obj_num * cur_epoch)
+                figure = vis_utils.plot_deformable_attn_weights(
+                    rearrange(attn_weight, 't l hp -> t (l hp)').cpu().numpy(),
+                    rearrange(attn_point, 't l hp c -> t (l hp) c').cpu().numpy(),
+                    refer_point[:, 0].cpu().numpy(), pil_imgs, boxes, pred_frameids)
+                writer.add_figure(figure, 'Deformable DETR 3D encoder-decoder multi-head attention weights',
                                   obj_counter + obj_num * cur_epoch)
                 obj_counter += 1
         

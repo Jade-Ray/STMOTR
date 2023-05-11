@@ -433,7 +433,7 @@ class Trainer:
                     global_step=cur_iter)
                 del medium_video
             
-            # visualization ablation images
+            # visualization decoder cross-attn images
             if self.writer is not None and vis_dec and cur_iter in vis_item:
                 if self.model._get_name() == 'DeformableSTMOTR':
                     t, b = box_offsets[-1].shape[:2]
