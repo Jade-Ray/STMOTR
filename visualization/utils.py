@@ -4,6 +4,7 @@ from typing import List
 from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+import mpl_toolkits.mplot3d.art3d as art3d
 
 import torch
 from torch import Tensor
@@ -244,38 +245,83 @@ def plot_multi_head_attention_weights(attn_weight: np.ndarray, pil_imgs: List[Im
     return fig
 
 
-def plot_deformable_attn_weights(attn_weights: np.ndarray, attn_points: np.ndarray,
-                                      spatial_shapes: np.ndarray,
-                                      refer_points: np.ndarray, expand_points: np.ndarray, 
-                                      pil_imgs: List[Image.Image], boxes: np.ndarray, 
-                                      query_id: int, frame_ids: np.ndarray):
-    """Visualize Deformable DETR encoder-decoder multi-head attention weights."""
-    # assert len({len(pil_imgs), len(frame_ids), len(boxes)}) == 1
-    # assert len({len(attn_weights), len(attn_points), len(refer_points), 
-    #             len(expand_points), len(spatial_shapes)}) == 1
-    ncols, nrows = len(pil_imgs) + 1, len(attn_weights)
-    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(25, 14))
-    for nl, (ax_j, weight, point, shape, refer_point, expand_point) in enumerate(zip \
-        (axs, attn_weights, attn_points, spatial_shapes, refer_points, expand_points)):
-        ax = ax_j[0]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            f = interpolate.interp2d(point[:, 0], point[:, 1], weight)
-            ax.imshow(f(np.arange(0, shape[0], 1), np.arange(0, shape[1], 1)))
-        ax.plot(refer_point[0], refer_point[1], 'k+', markersize=8)
-        ax.axis('off')
-        ax.set_title(f'level: {nl+1}')
+def plot_deformable_attn_weights_3d(attn_weights: np.ndarray, attn_points: np.ndarray, 
+                                    refer_points: np.ndarray, 
+                                    pil_imgs: List[Image.Image], boxes: np.ndarray, 
+                                    frame_ids: np.ndarray):
+    """Visualize Deformable DETR encoder-decoder multi-head attention weights as 3d.
+    
+    Args:
+        attn_weights: [num_frames, (num_levels * num_heads * num_points)]
+        attn_points: [num_frames, (num_levels * num_heads * num_points), 2]
+        refer_points: [num_frames, 2]
+        pil_imgs: [num_frames]
+        boxes: [num_frames, 4]
+        frame_ids: [num_frames]
+    """
+    fig = plt.figure(figsize=(8, 8), dpi=160)
+    ax = fig.add_subplot(projection='3d')
+    w, h = pil_imgs[0].size
+    num_points = attn_weights.shape[1]
+    num_frame = len(pil_imgs)
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
+    
+    idx = np.argsort(attn_weights, axis=1)
+    ax.scatter3D(np.take_along_axis(np.repeat(frame_ids, num_points).reshape(num_frame, -1), idx, axis=1),
+                 np.take_along_axis(attn_points[..., 0], idx, axis=1), 
+                 np.take_along_axis(attn_points[..., 1], idx, axis=1),
+                 c=np.take_along_axis(attn_weights, idx, axis=1),
+                 s=10, cmap=colormap, vmin=0.0, vmax=1.0)
+    ax.plot3D(frame_ids, refer_points[..., 0], refer_points[..., 1], 'g+', markersize=8)
+    for i, (l, t, r, b) in zip(frame_ids, boxes):
+        rec = plt.Rectangle((l, t), r -l, b - t, fill=False, color='g', linewidth=2)
+        ax.add_patch(rec)
+        art3d.pathpatch_2d_to_3d(rec, z=i, zdir="x")
+    
+    ax.set_xlabel('frame')
+    ax.set_xlim((frame_ids[0], frame_ids[-1]))
+    ax.set_ylabel('width')
+    ax.set_ylim((0, w))
+    ax.set_zlabel('height')
+    ax.set_zlim((h, 0))
+    return fig
+
+
+def plot_deformable_attn_weights_2d(attn_weights: np.ndarray, attn_points: np.ndarray, 
+                                    refer_points: np.ndarray, 
+                                    pil_imgs: List[Image.Image], boxes: np.ndarray, 
+                                    frame_ids: np.ndarray):
+    """Visualize Deformable DETR encoder-decoder multi-head attention weights as 3d.
+    
+    Args:
+        attn_weights: [num_frames, (num_levels * num_heads * num_points)]
+        attn_points: [num_frames, (num_levels * num_heads * num_points), 2]
+        refer_points: [num_frames, 2]
+        pil_imgs: [num_frames]
+        boxes: [num_frames, 4]
+        frame_ids: [num_frames]
+    """
+    nrows, ncols = len(pil_imgs), 1
+    colormap = LinearSegmentedColormap.from_list('mycamp', ['b', 'r'])
+    fig, axs = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True, figsize=(9, 14), dpi=120, layout='constrained')
+    for i, (img, (l, t, r, b), ax_row) in enumerate(zip(pil_imgs, boxes, axs)):
+        # ax_row.imshow(img)
+        # ax_row.add_patch(plt.Rectangle((l, t), r - l, b - t, fill=False, color='g', linewidth=2))
+        # ax_row.plot(refer_points[i, 0], refer_points[i, 1], 'g+', markersize=8)
         
-        for nf, (img, (l, t, r, b), f_point, frameid) in enumerate(zip \
-            (pil_imgs, boxes, expand_point, frame_ids)):
-            ax = ax_j[nf+1]
-            ax.imshow(img)
-            ax.add_patch(plt.Rectangle((l, t), r -l, b - t, fill=False, color='blue', linewidth=2))
-            ax.scatter(f_point[:, 0], f_point[:, 1], s=[6]*len(weight), c=weight)
-            ax.plot(l+(r-l)/2, t+(b-t)/2, 'g+', markersize=8)
-            ax.axis('off')
-            ax.set_title(f'frame id: {frameid} // query id: {query_id}')
-    fig.tight_layout()
+        data = np.zeros((img.height, img.width, 4), dtype=np.uint8)
+        img = Image.fromarray(data, 'RGBA') 
+        ax_row.imshow(img)
+        idx = np.argsort(attn_weights, axis=1)
+        sca = ax_row.scatter(attn_points[i, idx, 0], attn_points[i, idx, 1],
+                             c=attn_weights[i, idx], s=40, cmap=colormap, 
+                             vmin=0.0, vmax=1.0)
+
+        ax_row.set_xticks([])
+        ax_row.xaxis.set_label_position('top')
+        ax_row.set_xlim((0, img.width))
+        ax_row.set_yticks([])
+        ax_row.set_ylim((img.height, 0))
     return fig
 
 
@@ -311,12 +357,12 @@ def plot_deformable_lvl_attn_weights(attn_weights: np.ndarray, attn_points: np.n
             ax_col.set_yticks([])
             ax_col.set_ylim([img.height, 0])
             if ax_col.get_subplotspec().is_first_row():
-                ax_col.set_xlabel(f'feature level {j+1}', fontdict={"fontsize": 15})
+                ax_col.set_xlabel(f'feature level {j+1}', fontdict={"fontsize": 19, 'fontfamily': '得意黑 斜体'})
             if ax_col.get_subplotspec().is_first_col():
-                ax_col.set_ylabel(f'frame {frame_ids[i]}', fontdict={"fontsize": 15})
+                ax_col.set_ylabel(f'frame {frame_ids[i]}', fontdict={"fontsize": 19, 'fontfamily': '得意黑 斜体'})
     cbar = fig.colorbar(sca, ax=axs[0, -1], shrink=0.9, pad=0.01)
     cbar.set_ticks([0.02, 0.98])
-    cbar.set_ticklabels(['low', 'high'])
+    cbar.set_ticklabels(['low', 'high'], fontdict={"fontsize": 19, 'fontfamily': '得意黑 斜体'})
     cbar.ax.tick_params(labelsize=15)
     fig.get_layout_engine().set(w_pad=1 / 72, h_pad=1 / 72, hspace=0, wspace=0)
     return fig
