@@ -5,7 +5,7 @@ from einops import rearrange
 
 from models.backbone import build as backbone_build
 from models.matcher import build_matcher
-from models.multimodal_transformer import MultimodalTransformer
+from models.st_transformer import STTransformer
 from models.criterion import SetCriterion
 from models.postprocessing import BasePostProcess
 from utils.misc import NestedTensor
@@ -15,7 +15,7 @@ class STMOTR(nn.Module):
     def __init__(self, num_queries, aux_loss=False, **kwargs):
         super().__init__()
         self.backbone = backbone_build(**kwargs)
-        self.transformer = MultimodalTransformer(**kwargs)
+        self.transformer = STTransformer(**kwargs)
         
         d_model = self.transformer.d_model
         self.is_referred_head = nn.Linear(d_model, 2)  # binary 'is referred?' prediction head for object queries

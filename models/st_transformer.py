@@ -11,7 +11,7 @@ from .detr_helper import (TransformerEncoderLayer, TransformerEncoder,
 from .position_encoding import PositionEmbeddingSine2D
 
 
-class MultimodalTransformer(nn.Module):
+class STTransformer(nn.Module):
     def __init__(self, num_encoder_layers=3, num_decoder_layers=3, **kwargs):
         super().__init__()
         self.d_model = kwargs['d_model']
@@ -54,7 +54,7 @@ class MultimodalTransformer(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
     
 
-class MultimodalDeformableTransformer(nn.Module):
+class STDeformableTransformer(nn.Module):
     def __init__(self, feature_levels=4, num_encoder_layers=3, num_decoder_layers=3, **kwargs):
         super().__init__()
         self.d_model = kwargs['d_model']

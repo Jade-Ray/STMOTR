@@ -5,7 +5,7 @@ from einops import rearrange
 
 from models.backbone import build as backbone_build
 from models.matcher import build_matcher
-from models.multimodal_transformer import MultimodalDeformableTransformer
+from models.st_transformer import STDeformableTransformer
 from models.criterion import SetCriterion
 from models.postprocessing import BasePostProcess
 from utils.misc import NestedTensor, inverse_sigmoid
@@ -22,7 +22,7 @@ class DeformableSTMOTR(nn.Module):
         self.nheads = kwargs['nheads']
         self.npoints = kwargs['npoints']
         
-        self.transformer = MultimodalDeformableTransformer(
+        self.transformer = STDeformableTransformer(
             feature_levels=self.feature_levels, **kwargs)
         d_model = self.transformer.d_model
         
