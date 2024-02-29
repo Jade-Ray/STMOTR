@@ -1,6 +1,6 @@
 # Spatio-Temporal MultiObject Tracking Transformer
 
-The repository is an official implementation of the paper [End-to-End Multiple Object Detection and Tracking with Space-Time Transformers](https://www.overleaf.com/project/639bf5084573833d5afb0873).
+The repository is an official implementation of the paper [End-to-End Multiple Object Detection and Tracking with Space-Time Transformers]().
 
 ## Introduction
 
